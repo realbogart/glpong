@@ -72,14 +72,6 @@
 	"sourceSize": {"w":128,"h":32},
 	"pivot": {"x":0.5,"y":0.5}
 },
-
-
-
-
-
-
-
-
 {
 	"filename": "textures.png",
 	"frame": {"x":0,"y":16,"w":16,"h":16},
@@ -152,12 +144,6 @@
 	"sourceSize": {"w":128,"h":32},
 	"pivot": {"x":0.5,"y":0.5}
 },
-
-
-
-
-
-
 {
 	"filename": "textures.png",
 	"frame": {"x":0,"y":32,"w":16,"h":16},
@@ -230,11 +216,6 @@
 	"sourceSize": {"w":128,"h":32},
 	"pivot": {"x":0.5,"y":0.5}
 },
-
-
-
-
-
 {
 	"filename": "textures.png",
 	"frame": {"x":0,"y":48,"w":16,"h":16},
@@ -302,7 +283,7 @@
 	"filename": "textures.png",
 	"frame": {"x":112,"y":48,"w":16,"h":16},
 	"rotated": false,
-	"trimmed": false,3
+	"trimmed": false,
 	"spriteSourceSize": {"x":0,"y":0,"w":128,"h":32},
 	"sourceSize": {"w":128,"h":32},
 	"pivot": {"x":0.5,"y":0.5}
