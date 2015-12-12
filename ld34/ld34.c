@@ -23,7 +23,8 @@
 #define VIEW_WIDTH      256
 #define VIEW_HEIGHT		107
 
-#define NUM_TILES		4096
+#define ROOM_SIZE		256
+#define NUM_ROOMS		5
 
 struct game_settings settings = {
 	.view_width			= VIEW_WIDTH,
@@ -64,6 +65,17 @@ struct player{
 	player_state_t			state;
 };
 
+struct room_tile
+{
+	struct anim* tile_back;
+	struct anim* tile_front;
+};
+
+struct room
+{
+	struct room_tile tiles[ROOM_SIZE];
+};
+
 struct game {
 	struct atlas			atlas;
 	struct animatedsprites	*batcher;
@@ -71,9 +83,30 @@ struct game {
 
 	struct player			player;
 
+	vec2					camera;
+
+	struct room				rooms[NUM_ROOMS];
+
+	int						room_index;
+
 	struct anim tiles_grass;
+	struct anim tiles_cobble;
+	struct anim tiles_grain;
+	struct anim tiles_wood;
 	//struct anim* tiles_data[NUM_TILES];
 } *game = NULL;
+
+void rooms_init(struct game* game)
+{
+	for (int i = 0; i < NUM_ROOMS; i++)
+	{
+		for (int j = 0; j < ROOM_SIZE; j++)
+		{
+			game->rooms[i].tiles[j].tile_back = &game->tiles_wood;
+			game->rooms[i].tiles[j].tile_front = 0;
+		}
+	}
+}
 
 /*
 * PLAYER
@@ -200,7 +233,7 @@ void player_init(struct game* game)
 	set3f(game->player.sprite.position, VIEW_WIDTH / 2.0f, VIEW_HEIGHT / 2.0f, 0);
 	set2f(game->player.sprite.scale, 2.0f, 2.0f);
 
-	game->player.speed = 0.05f;
+	game->player.speed = 0.04f;
 	game->player.state = &player_idle;
 	game->player.dir = DIR_LEFT;
 
@@ -209,10 +242,10 @@ void player_init(struct game* game)
 	animatedsprites_setanim(&game->player.anim_idle_up, 1, 4, 2, 700.0f);
 	animatedsprites_setanim(&game->player.anim_idle_down, 1, 6, 2, 700.0f);
 
-	animatedsprites_setanim(&game->player.anim_walk_left, 1, 8, 2, 110.0f);
-	animatedsprites_setanim(&game->player.anim_walk_right, 1, 10, 2, 110.0f);
-	animatedsprites_setanim(&game->player.anim_walk_up, 1, 12, 2, 110.0f);
-	animatedsprites_setanim(&game->player.anim_walk_down, 1, 14, 2, 110.0f);
+	animatedsprites_setanim(&game->player.anim_walk_left, 1, 8, 2, 150.0f);
+	animatedsprites_setanim(&game->player.anim_walk_right, 1, 10, 2, 150.0f);
+	animatedsprites_setanim(&game->player.anim_walk_up, 1, 12, 2, 150.0f);
+	animatedsprites_setanim(&game->player.anim_walk_down, 1, 14, 2, 150.0f);
 
 	animatedsprites_playanimation(&game->player.sprite, &game->player.anim_idle_left);
 	animatedsprites_add(game->batcher, &game->player.sprite);
@@ -250,8 +283,14 @@ void game_think(struct core *core, struct graphics *g, float dt)
 
 	player_think( game, dt );
 	
-	tiles_think(&game->tiles, offset, &game->atlas, dt);
+	float dx = (game->player.sprite.position[0] - game->camera[0]) / 100.0f;
+	float dy = (game->player.sprite.position[1] - game->camera[1]) / 100.0f;
+	
+	game->camera[0] += dx;
+	game->camera[1] += dy;
+
 	animatedsprites_update(game->batcher, &game->atlas, dt);
+	tiles_think(&game->tiles, game->camera, &game->atlas, dt);
 	shader_uniforms_think(&assets->shaders.basic_shader, dt);
 }
 
@@ -265,7 +304,7 @@ void game_render(struct core *core, struct graphics *g, float dt)
 	mat4 final;
 
 	set2f(offset, 0.0f, 0.0f);
-	translate(offset, roundf(-offset[0]), roundf(-offset[1]), 0.0f);
+	translate(offset, -game->camera[0] + VIEW_WIDTH / 2, -game->camera[1] + VIEW_HEIGHT / 2, 0.0f);
 	transpose(final, offset);
 
 	tiles_render(&game->tiles, &assets->shaders.basic_shader, g, assets->textures.textures, transform);
@@ -286,29 +325,20 @@ void game_console_init(struct console *c)
 	/* console_env_bind_1f(c, "print_fps", &(game->print_fps)); */
 }
 
-struct anim* tiles_get_data_at(float x, float y,
+struct anim* tiles_get_back_data_at(float x, float y,
 	int tile_size, int grid_x_max, int grid_y_max)
 {
-	return &game->tiles_grass;
-	//int grid_x = (int)floor(x / (float)tile_size);
-	//int grid_y = (int)floor(y / (float)tile_size);
-	//if (grid_x < 0 || grid_y < 0
-	//	|| grid_x >= grid_x_max || grid_y >= grid_y_max) {
-	//	return NULL;
-	//}
-	//return game->tiles_data[grid_y * grid_x_max + grid_x];
+	int grid_x = (int)floor(x / (float)tile_size);
+	int grid_y = (int)floor(y / (float)tile_size);
+
+	if (grid_x < 0 || grid_y < 0 || grid_x >= grid_x_max || grid_y >= grid_y_max) 
+	{
+		return 0;
+	}
+
+	int tile_index = grid_y * grid_x_max + grid_x;
+	return game->rooms[game->room_index].tiles[tile_index].tile_back;
 }
-
-
-//void setup_tiles(struct game* game)
-//{
-//	animatedsprites_setanim(&game->tiles_grass, 1, 16, 1, 100.0f);
-//
-//	for (int i = 0; i < NUM_TILES; i++)
-//	{
-//		game->tiles_data[i] = &game->tiles_grass;
-//	}
-//}
 
 void game_init()
 {
@@ -317,9 +347,14 @@ void game_init()
 
 	//setup_tiles(game);
 	animatedsprites_setanim(&game->tiles_grass, 1, 16, 1, 100.0f);
-	tiles_init(&game->tiles, &tiles_get_data_at, 16, VIEW_WIDTH, VIEW_HEIGHT, 64, 64);
+	animatedsprites_setanim(&game->tiles_grain, 1, 17, 1, 100.0f);
+	animatedsprites_setanim(&game->tiles_wood, 1, 18, 1, 100.0f);
+
+	animatedsprites_setanim(&game->tiles_cobble, 1, 19, 1, 100.0f);
+	tiles_init(&game->tiles, &tiles_get_back_data_at, 16, VIEW_WIDTH, VIEW_HEIGHT, 16, 16);
 
 	player_init( game );
+	rooms_init( game );
 }
 
 void game_key_callback(struct core *core, struct input *input, GLFWwindow *window, int key,
