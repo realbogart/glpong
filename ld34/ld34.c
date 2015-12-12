@@ -19,6 +19,7 @@
 #include "atlas.h"
 #include "animatedsprites.h"
 #include "top-down\tiles.h"
+#include "collide.h"
 #include "GLFW\glfw3.h"
 
 #define VIEW_WIDTH      256
@@ -87,6 +88,8 @@ struct room_tile
 
 	int				extra_data[8];
 
+	int walkable;
+
 	struct anim*	tile_back;
 	struct anim*	tile_front;
 };
@@ -97,6 +100,9 @@ struct room
 };
 
 struct game {
+	struct sprite			debug_pos;
+	struct anim				anim_debug;
+
 	struct atlas			atlas;
 	struct animatedsprites	*batcher;
 	struct tiles			tiles_back;
@@ -154,13 +160,21 @@ void room_setup_tile(struct game* game, int room_index, int tile_index, enum til
 			*tile = &game->tiles_wall_top;
 			break;
 		case TILE_WALL_MID:
+		{
+			game->rooms[room_index].tiles[tile_index].walkable = 0;
 			*tile = &game->tiles_wall_mid;
+		}
 			break;
 		case TILE_WALL_BOTTOM:
+		{
+			game->rooms[room_index].tiles[tile_index].walkable = 0;
 			*tile = &game->tiles_wall_bottom;
+		}
 			break;
 		case TILE_STONEFLOOR:
+		{
 			*tile = &game->tiles_stonefloor;
+		}
 			break;
 	}
 }
@@ -217,6 +231,7 @@ void rooms_init(struct game* game)
 				game->rooms[i].tiles[j].extra_data[8] = 0;
 			}
 	
+			game->rooms[i].tiles[j].walkable = 1;
 			game->rooms[i].tiles[j].type_back = TILE_NONE;
 			game->rooms[i].tiles[j].type_front = TILE_NONE;
 		}
@@ -274,6 +289,35 @@ void player_idle(struct game* game, float dt)
 		animatedsprites_switchanimation(&game->player, &game->player.anim_idle_down);
 		break;
 	}
+}
+
+struct room_tile* get_room_tile_at(float x, float y, int tile_size, int grid_x_max, int grid_y_max, int* tile_index_out);
+void room_edit_place_front(float x, float y);
+void room_edit_place_back(float x, float y);
+
+int is_tile_collision(struct game* game, float x, float y)
+{
+	x += VIEW_WIDTH / 2;
+	y += VIEW_HEIGHT / 2;
+
+	int index = -1;
+	struct room_tile* tile = get_room_tile_at(x, y, 16, 16, 16, &index);
+
+	if (index != -1)
+	{
+		if (!tile->walkable)
+		{
+			set2f(game->debug_pos.scale, 0.5f, 0.5f);
+			return 1;
+		}
+		else
+		{
+			set2f(game->debug_pos.scale, 0.2f, 0.2f);
+			return 0;
+		}
+	}
+
+	return 1;
 }
 
 void player_walk(struct game* game, float dt)
@@ -338,16 +382,26 @@ void player_walk(struct game* game, float dt)
 		break;
 	}
 
-	// TODO: Collision check
+	set2f(game->debug_pos.position, game->player.sprite.position[0], game->player.sprite.position[1] - 8.0f);
 
-	set2f(game->player.sprite.position, pos[0], pos[1]);
+	// X check
+	if (!is_tile_collision(game, pos[0], game->player.sprite.position[1] - 8.0f))
+	{
+		set2f(game->player.sprite.position, pos[0], game->player.sprite.position[1]);
+	}
+	
+	// Y check
+	if (!is_tile_collision(game, game->player.sprite.position[0], pos[1] - 8.0f))
+	{
+		set2f(game->player.sprite.position, game->player.sprite.position[0], pos[1]);
+	}
 }
 
 void player_init(struct game* game)
 {
 	set3f(game->player.sprite.position, -69.0f, -12.0f, 0);
 	set3f(game->camera, -69.0f, -12.0f, 0);
-	set2f(game->player.sprite.scale, 2.0f, 2.0f);
+	set2f(game->player.sprite.scale, 1.5f, 1.5f);
 
 	game->player.speed = 0.04f;
 	game->player.state = &player_idle;
@@ -364,7 +418,9 @@ void player_init(struct game* game)
 	animatedsprites_setanim(&game->player.anim_walk_down, 1, 14, 2, 150.0f);
 
 	animatedsprites_playanimation(&game->player.sprite, &game->player.anim_idle_left);
+	animatedsprites_playanimation(&game->debug_pos, &game->anim_debug);
 	animatedsprites_add(game->batcher, &game->player.sprite);
+	animatedsprites_add(game->batcher, &game->debug_pos);
 }
 
 void player_think(struct game* game, float dt)
@@ -608,6 +664,7 @@ void game_init()
 	animatedsprites_setanim(&game->tiles_wall_mid, 20, 22, 1, 100.0f);
 	animatedsprites_setanim(&game->tiles_wall_bottom, 1, 23, 1, 100.0f);
 	animatedsprites_setanim(&game->tiles_stonefloor, 1, 24, 1, 100.0f);
+	animatedsprites_setanim(&game->anim_debug, 1, 25, 1, 100.0f);
 
 	tiles_init(&game->tiles_back, &tiles_get_back_data_at, 16, VIEW_WIDTH, VIEW_HEIGHT, 16, 16);
 	tiles_init(&game->tiles_front, &tiles_get_front_data_at, 16, VIEW_WIDTH, VIEW_HEIGHT, 16, 16);
@@ -616,6 +673,11 @@ void game_init()
 	game->edit_current_type = TILE_NONE;
 
 	player_init(game);
+
+	set2f(game->debug_pos.scale, 0.2f, 0.2f);
+	set2f(game->debug_pos.position, game->player.sprite.position[0], game->player.sprite.position[1]);
+
+	rooms_init(game);
 	rooms_load(game);
 }
 
