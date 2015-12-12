@@ -20,8 +20,8 @@
 #include "animatedsprites.h"
 #include "top-down\tiles.h"
 
-#define VIEW_WIDTH      1024
-#define VIEW_HEIGHT		428
+#define VIEW_WIDTH      512
+#define VIEW_HEIGHT		214
 
 #define NUM_TILES		4096
 
@@ -131,7 +131,7 @@ void game_init()
 
 	/* Create sprite. */
 	set3f(game->sprite.position, VIEW_WIDTH/2.0f, VIEW_HEIGHT/2.0f, 0);
-	set2f(game->sprite.scale, 10.0f, 10.0f);
+	set2f(game->sprite.scale, 2.0f, 2.0f);
 
 	animatedsprites_playanimation(&game->sprite, &game->anim_sprite);
 	animatedsprites_add(game->batcher, &game->sprite);
