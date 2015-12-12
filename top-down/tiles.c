@@ -39,15 +39,15 @@ static struct sprite* tiles_get_draw_tile(struct sprite *draw_tiles, int x, int 
  * @param tiles_x		The width of the data 2D array.
  * @param tiles_y		The height of the data 2D array.
  */
-void tiles_init(struct tiles *tiles, struct anim **data, int tile_size,
+void tiles_init(struct tiles *tiles, tiles_get_data_at_pixel_t get_data_at_pixel_fn, int tile_size,
 		int view_width, int view_height, int tiles_x, int tiles_y)
 {
 	tiles->tile_size = tile_size;
 	tiles->view_width = view_width;
 	tiles->view_height = view_height;
-	tiles->data = data;
 	tiles->tiles_x = tiles_x;
 	tiles->tiles_y = tiles_y;
+	tiles->get_data_at_pixel_fn = get_data_at_pixel_fn;
 	tiles->draw_tiles_x = view_width/tile_size + 3;
 	tiles->draw_tiles_y = view_height/tile_size + 3;
 
@@ -109,10 +109,9 @@ void tiles_think(struct tiles *tiles, vec2 view_offset, struct atlas *atlas, flo
 			float grid_y = (y-1) * tiles->tile_size + tiles->tile_size/2.0f - fmod(view_offset[1], tiles->tile_size);
 
 			/* Get tile at coordinate. */
-			struct anim *type = tiles_get_data_at_pixel((struct anim **) tiles->data,
-					view_offset[0] + grid_x,
-					view_offset[1] + grid_y,
-					tiles->tile_size, tiles->tiles_x, tiles->tiles_y);
+			struct anim *type = tiles->get_data_at_pixel_fn(view_offset[0] + grid_x,
+															view_offset[1] + grid_y,
+															tiles->tile_size, tiles->tiles_x, tiles->tiles_y);
 
 			/* Set correct animation. */
 			if(draw_tile->anim != type) {
@@ -130,16 +129,4 @@ void tiles_think(struct tiles *tiles, vec2 view_offset, struct atlas *atlas, flo
 void tiles_render(struct tiles *tiles, struct shader *s, struct graphics *g, GLuint tex, mat4 transform)
 {
 	animatedsprites_render(tiles->batcher, s, g, tex, transform);
-}
-
-struct anim* tiles_get_data_at_pixel(struct anim **data, float x, float y,
-		int tile_size, int grid_x_max, int grid_y_max)
-{
-	int grid_x = (int) floor(x / (float) tile_size);
-	int grid_y = (int) floor(y / (float) tile_size);
-	if(grid_x < 0 || grid_y < 0
-			|| grid_x >= grid_x_max || grid_y >= grid_y_max) {
-		return NULL;
-	}
-	return data[grid_y * grid_x_max + grid_x];
 }
