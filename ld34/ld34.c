@@ -307,12 +307,10 @@ int is_tile_collision(struct game* game, float x, float y)
 	{
 		if (!tile->walkable)
 		{
-			set2f(game->debug_pos.scale, 0.5f, 0.5f);
 			return 1;
 		}
 		else
 		{
-			set2f(game->debug_pos.scale, 0.2f, 0.2f);
 			return 0;
 		}
 	}
@@ -385,13 +383,15 @@ void player_walk(struct game* game, float dt)
 	set2f(game->debug_pos.position, game->player.sprite.position[0], game->player.sprite.position[1] - 8.0f);
 
 	// X check
-	if (!is_tile_collision(game, pos[0], game->player.sprite.position[1] - 8.0f))
+	if (!is_tile_collision(game, pos[0] - 4.0f, game->player.sprite.position[1] - 6.0f) &&
+		!is_tile_collision(game, pos[0] + 4.0f, game->player.sprite.position[1] - 6.0f))
 	{
 		set2f(game->player.sprite.position, pos[0], game->player.sprite.position[1]);
 	}
 	
 	// Y check
-	if (!is_tile_collision(game, game->player.sprite.position[0], pos[1] - 8.0f))
+	if (!is_tile_collision(game, game->player.sprite.position[0] - 4.0f, pos[1] - 6.0f) &&
+		!is_tile_collision(game, game->player.sprite.position[0] + 4.0f, pos[1] - 6.0f))
 	{
 		set2f(game->player.sprite.position, game->player.sprite.position[0], pos[1]);
 	}
@@ -401,7 +401,7 @@ void player_init(struct game* game)
 {
 	set3f(game->player.sprite.position, -69.0f, -12.0f, 0);
 	set3f(game->camera, -69.0f, -12.0f, 0);
-	set2f(game->player.sprite.scale, 1.5f, 1.5f);
+	set2f(game->player.sprite.scale, 1.3f, 1.3f);
 
 	game->player.speed = 0.04f;
 	game->player.state = &player_idle;
