@@ -88,8 +88,6 @@ struct room_tile
 
 	int				extra_data[8];
 
-	int walkable;
-
 	struct anim*	tile_back;
 	struct anim*	tile_front;
 };
@@ -161,13 +159,11 @@ void room_setup_tile(struct game* game, int room_index, int tile_index, enum til
 			break;
 		case TILE_WALL_MID:
 		{
-			game->rooms[room_index].tiles[tile_index].walkable = 0;
 			*tile = &game->tiles_wall_mid;
 		}
 			break;
 		case TILE_WALL_BOTTOM:
 		{
-			game->rooms[room_index].tiles[tile_index].walkable = 0;
 			*tile = &game->tiles_wall_bottom;
 		}
 			break;
@@ -231,7 +227,6 @@ void rooms_init(struct game* game)
 				game->rooms[i].tiles[j].extra_data[8] = 0;
 			}
 	
-			game->rooms[i].tiles[j].walkable = 1;
 			game->rooms[i].tiles[j].type_back = TILE_NONE;
 			game->rooms[i].tiles[j].type_front = TILE_NONE;
 		}
@@ -305,7 +300,7 @@ int is_tile_collision(struct game* game, float x, float y)
 
 	if (index != -1)
 	{
-		if (!tile->walkable)
+		if (tile->type_back != TILE_STONEFLOOR)
 		{
 			return 1;
 		}
@@ -384,14 +379,18 @@ void player_walk(struct game* game, float dt)
 
 	// X check
 	if (!is_tile_collision(game, pos[0] - 4.0f, game->player.sprite.position[1] - 6.0f) &&
-		!is_tile_collision(game, pos[0] + 4.0f, game->player.sprite.position[1] - 6.0f))
+		!is_tile_collision(game, pos[0] + 4.0f, game->player.sprite.position[1] - 6.0f) &&
+		!is_tile_collision(game, pos[0] - 4.0f, game->player.sprite.position[1] - 8.0f) &&
+		!is_tile_collision(game, pos[0] + 4.0f, game->player.sprite.position[1] - 8.0f) )
 	{
 		set2f(game->player.sprite.position, pos[0], game->player.sprite.position[1]);
 	}
 	
 	// Y check
 	if (!is_tile_collision(game, game->player.sprite.position[0] - 4.0f, pos[1] - 6.0f) &&
-		!is_tile_collision(game, game->player.sprite.position[0] + 4.0f, pos[1] - 6.0f))
+		!is_tile_collision(game, game->player.sprite.position[0] + 4.0f, pos[1] - 6.0f) &&
+		!is_tile_collision(game, game->player.sprite.position[0] - 4.0f, pos[1] - 8.0f) &&
+		!is_tile_collision(game, game->player.sprite.position[0] + 4.0f, pos[1] - 8.0f))
 	{
 		set2f(game->player.sprite.position, game->player.sprite.position[0], pos[1]);
 	}
@@ -420,7 +419,8 @@ void player_init(struct game* game)
 	animatedsprites_playanimation(&game->player.sprite, &game->player.anim_idle_left);
 	animatedsprites_playanimation(&game->debug_pos, &game->anim_debug);
 	animatedsprites_add(game->batcher, &game->player.sprite);
-	animatedsprites_add(game->batcher, &game->debug_pos);
+	
+	//animatedsprites_add(game->batcher, &game->debug_pos);
 }
 
 void player_think(struct game* game, float dt)
