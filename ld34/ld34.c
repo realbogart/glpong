@@ -51,13 +51,13 @@ enum direction
 
 enum tile_type
 {
-	NONE = 0,
-	WOOD,
-	GRAIN,
-	COBBLE,
-	WALL_TOP,
-	WALL_MID,
-	WALL_BOTTOM
+	TILE_NONE = 0,
+	TILE_WOOD,
+	TILE_GRAIN,
+	TILE_COBBLE,
+	TILE_WALL_TOP,
+	TILE_WALL_MID,
+	TILE_WALL_BOTTOM
 };
 
 struct player{
@@ -108,6 +108,9 @@ struct game {
 
 	int						room_index;
 
+	int						edit_current_room;
+	enum tile_type			edit_current_type;
+
 	struct anim tiles_grass;
 	struct anim tiles_cobble;
 	struct anim tiles_grain;
@@ -133,22 +136,25 @@ void room_setup_tile(struct game* game, int room_index, int tile_index, enum til
 
 	switch (type)
 	{
-		case WOOD:
+		case TILE_NONE:
+			*tile = 0;
+			break;
+		case TILE_WOOD:
 			*tile = &game->tiles_wood;
 			break;
-		case GRAIN:
+		case TILE_GRAIN:
 			*tile = &game->tiles_grain;
 			break;
-		case COBBLE:
+		case TILE_COBBLE:
 			*tile = &game->tiles_cobble;
 			break;
-		case WALL_TOP:
+		case TILE_WALL_TOP:
 			*tile = &game->tiles_wall_top;
 			break;
-		case WALL_MID:
+		case TILE_WALL_MID:
 			*tile = &game->tiles_wall_mid;
 			break;
-		case WALL_BOTTOM:
+		case TILE_WALL_BOTTOM:
 			*tile = &game->tiles_wall_bottom;
 			break;
 	}
@@ -206,8 +212,8 @@ void rooms_init(struct game* game)
 				game->rooms[i].tiles[j].extra_data[8] = 0;
 			}
 	
-			game->rooms[i].tiles[j].type_back = NONE;
-			game->rooms[i].tiles[j].type_front = NONE;
+			game->rooms[i].tiles[j].type_back = TILE_NONE;
+			game->rooms[i].tiles[j].type_front = TILE_NONE;
 		}
 	}
 }
@@ -378,13 +384,79 @@ void game_init_memory(struct shared_memory *shared_memory, int reload)
 	input_global = shared_memory->input;
 }
 
-void game_think(struct core *core, struct graphics *g, float dt)
+void room_edit()
 {
 	// Room save/load logic
 	if (key_pressed(GLFW_KEY_F9))
 	{
 		rooms_save(game);
 	}
+
+	if (key_pressed(GLFW_KEY_F4))
+	{
+		game->edit_current_room = 0;
+	}
+	if (key_pressed(GLFW_KEY_F5))
+	{
+		game->edit_current_room = 1;
+	}
+	if (key_pressed(GLFW_KEY_F6))
+	{
+		game->edit_current_room = 2;
+	}
+	if (key_pressed(GLFW_KEY_F7))
+	{
+		game->edit_current_room = 3;
+	}
+	if (key_pressed(GLFW_KEY_F8))
+	{
+		game->edit_current_room = 4;
+	}
+
+	if (key_pressed(GLFW_KEY_KP_0))
+	{
+		game->edit_current_type = TILE_NONE;
+	}
+	if (key_pressed(GLFW_KEY_KP_1))
+	{
+		game->edit_current_type = TILE_WALL_BOTTOM;
+	}
+	if (key_pressed(GLFW_KEY_KP_2))
+	{
+		game->edit_current_type = TILE_WALL_MID;
+	}
+	if (key_pressed(GLFW_KEY_KP_3))
+	{
+		game->edit_current_type = TILE_WALL_TOP;
+	}
+	if (key_pressed(GLFW_KEY_KP_4))
+	{
+		game->edit_current_type = TILE_WOOD;
+	}
+	if (key_pressed(GLFW_KEY_KP_5))
+	{
+		game->edit_current_type = TILE_GRAIN;
+	}
+	if (key_pressed(GLFW_KEY_KP_6))
+	{
+		game->edit_current_type = TILE_WOOD;
+	}
+	if (key_pressed(GLFW_KEY_KP_7))
+	{
+	}
+	if (key_pressed(GLFW_KEY_KP_8))
+	{
+
+	}
+	if (key_pressed(GLFW_KEY_KP_9))
+	{
+
+	}
+}
+
+void game_think(struct core *core, struct graphics *g, float dt)
+{
+	room_edit();
 
 	vec2 offset;
 	set2f(offset, 0.0f, 0.0f);
@@ -481,6 +553,9 @@ void game_init()
 
 	tiles_init(&game->tiles_back, &tiles_get_back_data_at, 16, VIEW_WIDTH, VIEW_HEIGHT, 16, 16);
 	tiles_init(&game->tiles_front, &tiles_get_front_data_at, 16, VIEW_WIDTH, VIEW_HEIGHT, 16, 16);
+
+	game->edit_current_room = 0;
+	game->edit_current_type = TILE_NONE;
 
 	player_init(game);
 	rooms_load(game);
