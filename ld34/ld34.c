@@ -578,6 +578,11 @@ void room_edit(float dt)
 	}
 }
 
+void shader_think(struct game* game)
+{
+
+}
+
 void game_think(struct core *core, struct graphics *g, float dt)
 {
 	room_edit(dt);
