@@ -20,8 +20,8 @@
 #include "animatedsprites.h"
 #include "top-down\tiles.h"
 
-#define VIEW_WIDTH      512
-#define VIEW_HEIGHT		214
+#define VIEW_WIDTH      256
+#define VIEW_HEIGHT		107
 
 #define NUM_TILES		4096
 
@@ -35,16 +35,195 @@ struct game_settings settings = {
 	.sound_distance_max = 500.0f, // distance3f(vec3(0), sound_listener)
 };
 
-struct game {
+struct game;
+typedef void(*player_state_t)(struct game*, float);
+
+enum direction
+{
+	DIR_RIGHT = 0,
+	DIR_LEFT,
+	DIR_UP,
+	DIR_DOWN
+};
+
+struct player{
 	struct sprite			sprite;
+	struct anim				anim_idle_left;
+	struct anim				anim_idle_right;
+	struct anim				anim_idle_up;
+	struct anim				anim_idle_down;
+
+	struct anim				anim_walk_left;
+	struct anim				anim_walk_right;
+	struct anim				anim_walk_up;
+	struct anim				anim_walk_down;
+
+	enum direction			dir;
+
+	float					speed;
+	player_state_t			state;
+};
+
+struct game {
 	struct atlas			atlas;
 	struct animatedsprites	*batcher;
-	struct anim				anim_sprite;
 	struct tiles			tiles;
 
+	struct player			player;
+
 	struct anim tiles_grass;
-	struct anim* tiles_data[NUM_TILES];
+	//struct anim* tiles_data[NUM_TILES];
 } *game = NULL;
+
+/*
+* PLAYER
+*/
+void player_walk(struct game* game, float dt);
+
+void player_idle(struct game* game, float dt)
+{
+	int enter_walk = 0;
+	if(key_pressed(GLFW_KEY_LEFT))
+	{
+		game->player.dir = DIR_LEFT;
+		enter_walk = 1;
+	}
+	else if (key_pressed(GLFW_KEY_RIGHT))
+	{
+		game->player.dir = DIR_RIGHT;
+		enter_walk = 1;
+	}
+	else if (key_pressed(GLFW_KEY_UP))
+	{
+		game->player.dir = DIR_UP;
+		enter_walk = 1;
+	}
+	else if (key_pressed(GLFW_KEY_DOWN))
+	{
+		game->player.dir = DIR_DOWN;
+		enter_walk = 1;
+	}
+
+	if (enter_walk)
+	{
+		game->player.state = &player_walk;
+		return;
+	}
+
+	// Set correct idle animation
+	switch (game->player.dir)
+	{
+	case DIR_LEFT:
+		animatedsprites_switchanimation(&game->player, &game->player.anim_idle_left);
+		break;
+	case DIR_RIGHT:
+		animatedsprites_switchanimation(&game->player, &game->player.anim_idle_right);
+		break;
+	case DIR_UP:
+		animatedsprites_switchanimation(&game->player, &game->player.anim_idle_up);
+		break;
+	case DIR_DOWN:
+		animatedsprites_switchanimation(&game->player, &game->player.anim_idle_down);
+		break;
+	}
+}
+
+void player_walk(struct game* game, float dt)
+{
+	// Check if player idle
+	if (!key_down(GLFW_KEY_RIGHT) && 
+		!key_down(GLFW_KEY_LEFT) && 
+		!key_down(GLFW_KEY_UP) && 
+		!key_down(GLFW_KEY_DOWN))
+	{
+		game->player.state = &player_idle;
+		return;
+	}
+
+	vec2 pos;
+	set2f(pos, game->player.sprite.position[0], game->player.sprite.position[1]);
+
+	// Check if player change direction while moving
+	if (key_down(GLFW_KEY_LEFT))
+	{
+		game->player.dir = DIR_LEFT;
+		pos[0] -= game->player.speed * dt;
+	}
+	if (key_down(GLFW_KEY_RIGHT))
+	{
+		game->player.dir = DIR_RIGHT;
+		pos[0] += game->player.speed * dt;
+	}
+	if (key_down(GLFW_KEY_UP))
+	{
+		game->player.dir = DIR_UP;
+		pos[1] += game->player.speed * dt;
+	}
+	if (key_down(GLFW_KEY_DOWN))
+	{
+		game->player.dir = DIR_DOWN;
+		pos[1] -= game->player.speed * dt;
+	}
+
+	// Move player and set correct walking animation
+	switch (game->player.dir)
+	{
+	case DIR_LEFT:
+	{
+		animatedsprites_switchanimation(&game->player, &game->player.anim_walk_left);
+	}
+		break;
+	case DIR_RIGHT:
+	{
+		animatedsprites_switchanimation(&game->player, &game->player.anim_walk_right);
+	}
+		break;
+	case DIR_UP:
+	{
+		animatedsprites_switchanimation(&game->player, &game->player.anim_walk_up);
+	}
+		break;
+	case DIR_DOWN:
+	{
+		animatedsprites_switchanimation(&game->player, &game->player.anim_walk_down);
+	}
+		break;
+	}
+
+	// TODO: Collision check
+
+	set2f(game->player.sprite.position, pos[0], pos[1]);
+}
+
+void player_init(struct game* game)
+{
+	set3f(game->player.sprite.position, VIEW_WIDTH / 2.0f, VIEW_HEIGHT / 2.0f, 0);
+	set2f(game->player.sprite.scale, 2.0f, 2.0f);
+
+	game->player.speed = 0.05f;
+	game->player.state = &player_idle;
+	game->player.dir = DIR_LEFT;
+
+	animatedsprites_setanim(&game->player.anim_idle_left, 1, 0, 2, 700.0f);
+	animatedsprites_setanim(&game->player.anim_idle_right, 1, 2, 2, 700.0f);
+	animatedsprites_setanim(&game->player.anim_idle_up, 1, 4, 2, 700.0f);
+	animatedsprites_setanim(&game->player.anim_idle_down, 1, 6, 2, 700.0f);
+
+	animatedsprites_setanim(&game->player.anim_walk_left, 1, 8, 2, 110.0f);
+	animatedsprites_setanim(&game->player.anim_walk_right, 1, 10, 2, 110.0f);
+	animatedsprites_setanim(&game->player.anim_walk_up, 1, 12, 2, 110.0f);
+	animatedsprites_setanim(&game->player.anim_walk_down, 1, 14, 2, 110.0f);
+
+	animatedsprites_playanimation(&game->player.sprite, &game->player.anim_idle_left);
+	animatedsprites_add(game->batcher, &game->player.sprite);
+}
+
+void player_think(struct game* game, float dt)
+{
+	game->player.state(game, dt);
+}
+
+
 
 struct game_settings* game_get_settings()
 {
@@ -69,6 +248,8 @@ void game_think(struct core *core, struct graphics *g, float dt)
 	vec2 offset;
 	set2f(offset, 0.0f, 0.0f);
 
+	player_think( game, dt );
+	
 	tiles_think(&game->tiles, offset, &game->atlas, dt);
 	animatedsprites_update(game->batcher, &game->atlas, dt);
 	shader_uniforms_think(&assets->shaders.basic_shader, dt);
@@ -105,36 +286,40 @@ void game_console_init(struct console *c)
 	/* console_env_bind_1f(c, "print_fps", &(game->print_fps)); */
 }
 
-void setup_tiles()
+struct anim* tiles_get_data_at(float x, float y,
+	int tile_size, int grid_x_max, int grid_y_max)
 {
-	for (int i = 0; i < NUM_TILES; i++)
-	{
-		game->tiles_data[i] = &game->tiles_grass;
-	}
+	return &game->tiles_grass;
+	//int grid_x = (int)floor(x / (float)tile_size);
+	//int grid_y = (int)floor(y / (float)tile_size);
+	//if (grid_x < 0 || grid_y < 0
+	//	|| grid_x >= grid_x_max || grid_y >= grid_y_max) {
+	//	return NULL;
+	//}
+	//return game->tiles_data[grid_y * grid_x_max + grid_x];
 }
+
+
+//void setup_tiles(struct game* game)
+//{
+//	animatedsprites_setanim(&game->tiles_grass, 1, 16, 1, 100.0f);
+//
+//	for (int i = 0; i < NUM_TILES; i++)
+//	{
+//		game->tiles_data[i] = &game->tiles_grass;
+//	}
+//}
 
 void game_init()
 {
 	glClearColor(0.0f, 0.0f, 0.0f, 0.0f);
-
-	/* Create animated sprite batcher. */
 	game->batcher = animatedsprites_create();
 
-	/* Setup tiles */
-	animatedsprites_setanim(&game->tiles_grass, 1, 1, 1, 100.0f);
+	//setup_tiles(game);
+	animatedsprites_setanim(&game->tiles_grass, 1, 16, 1, 100.0f);
+	tiles_init(&game->tiles, &tiles_get_data_at, 16, VIEW_WIDTH, VIEW_HEIGHT, 64, 64);
 
-	setup_tiles();
-	tiles_init(&game->tiles, &game->tiles_data, 16, VIEW_WIDTH, VIEW_HEIGHT, 64, 64);
-
-	/* Create sprite animation. */
-	animatedsprites_setanim(&game->anim_sprite, 1, 0, 1, 300.0f);
-
-	/* Create sprite. */
-	set3f(game->sprite.position, VIEW_WIDTH/2.0f, VIEW_HEIGHT/2.0f, 0);
-	set2f(game->sprite.scale, 2.0f, 2.0f);
-
-	animatedsprites_playanimation(&game->sprite, &game->anim_sprite);
-	animatedsprites_add(game->batcher, &game->sprite);
+	player_init( game );
 }
 
 void game_key_callback(struct core *core, struct input *input, GLFWwindow *window, int key,
