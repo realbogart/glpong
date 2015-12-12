@@ -19,6 +19,7 @@
 #include "atlas.h"
 #include "animatedsprites.h"
 #include "top-down\tiles.h"
+#include "GLFW\glfw3.h"
 
 #define VIEW_WIDTH      256
 #define VIEW_HEIGHT		107
@@ -57,7 +58,8 @@ enum tile_type
 	TILE_COBBLE,
 	TILE_WALL_TOP,
 	TILE_WALL_MID,
-	TILE_WALL_BOTTOM
+	TILE_WALL_BOTTOM,
+	TILE_STONEFLOOR
 };
 
 struct player{
@@ -108,13 +110,13 @@ struct game {
 
 	int						room_index;
 
-	int						edit_current_room;
 	enum tile_type			edit_current_type;
 
 	struct anim tiles_grass;
 	struct anim tiles_cobble;
 	struct anim tiles_grain;
 	struct anim tiles_wood;
+	struct anim tiles_stonefloor;
 	struct anim tiles_wall_top;
 	struct anim tiles_wall_mid;
 	struct anim tiles_wall_bottom;
@@ -156,6 +158,9 @@ void room_setup_tile(struct game* game, int room_index, int tile_index, enum til
 			break;
 		case TILE_WALL_BOTTOM:
 			*tile = &game->tiles_wall_bottom;
+			break;
+		case TILE_STONEFLOOR:
+			*tile = &game->tiles_stonefloor;
 			break;
 	}
 }
@@ -340,12 +345,13 @@ void player_walk(struct game* game, float dt)
 
 void player_init(struct game* game)
 {
-	set3f(game->player.sprite.position, VIEW_WIDTH / 2.0f, VIEW_HEIGHT / 2.0f, 0);
+	set3f(game->player.sprite.position, -69.0f, -12.0f, 0);
+	set3f(game->camera, -69.0f, -12.0f, 0);
 	set2f(game->player.sprite.scale, 2.0f, 2.0f);
 
 	game->player.speed = 0.04f;
 	game->player.state = &player_idle;
-	game->player.dir = DIR_LEFT;
+	game->player.dir = DIR_DOWN;
 
 	animatedsprites_setanim(&game->player.anim_idle_left, 1, 0, 2, 700.0f);
 	animatedsprites_setanim(&game->player.anim_idle_right, 1, 2, 2, 700.0f);
@@ -384,8 +390,69 @@ void game_init_memory(struct shared_memory *shared_memory, int reload)
 	input_global = shared_memory->input;
 }
 
-void room_edit()
+struct anim* tiles_get_back_data_at(float x, float y,
+	int tile_size, int grid_x_max, int grid_y_max)
 {
+	int grid_x = (int)floor(x / (float)tile_size);
+	int grid_y = (int)floor(y / (float)tile_size);
+
+	if (grid_x < 0 || grid_y < 0 || grid_x >= grid_x_max || grid_y >= grid_y_max)
+	{
+		return 0;
+	}
+
+	int tile_index = grid_y * grid_x_max + grid_x;
+	return game->rooms[game->room_index].tiles[tile_index].tile_back;
+}
+
+struct room_tile* get_room_tile_at(float x, float y, int tile_size, int grid_x_max, int grid_y_max, int* tile_index_out)
+{
+	int grid_x = (int)floor(x / (float)tile_size);
+	int grid_y = (int)floor(y / (float)tile_size);
+
+	if (grid_x < 0 || grid_y < 0 || grid_x >= grid_x_max || grid_y >= grid_y_max)
+	{
+		return 0;
+	}
+
+	*tile_index_out = grid_y * grid_x_max + grid_x;
+	return &game->rooms[game->room_index].tiles[*tile_index_out];
+}
+
+void room_edit_place_back(float x, float y)
+{
+	int index = 0;
+	struct room_tile* tile = get_room_tile_at(x, y, 16, 16, 16, &index);
+	room_setup_tile(game, game->room_index, index, game->edit_current_type, 1);
+}
+
+void room_edit_place_front(float x, float y)
+{
+	int index = 0;
+	struct room_tile* tile = get_room_tile_at(x, y, 16, 16, 16, &index);
+	room_setup_tile(game, game->room_index, index, game->edit_current_type, 0);
+}
+
+void room_edit(float dt)
+{
+	int left_mouse = glfwGetMouseButton(core_global->graphics.window, GLFW_MOUSE_BUTTON_LEFT);
+	int right_mouse = glfwGetMouseButton(core_global->graphics.window, GLFW_MOUSE_BUTTON_RIGHT);
+
+	float x = 0, y = 0;
+	input_view_get_cursor(core_global->graphics.window, &x, &y);
+
+	x += game->camera[0];
+	y += game->camera[1];
+
+	if (left_mouse == GLFW_PRESS)
+	{
+		room_edit_place_back(x, y);
+	}
+	if (right_mouse == GLFW_PRESS)
+	{
+		room_edit_place_front(x, y);
+	}
+
 	// Room save/load logic
 	if (key_pressed(GLFW_KEY_F9))
 	{
@@ -394,23 +461,23 @@ void room_edit()
 
 	if (key_pressed(GLFW_KEY_F4))
 	{
-		game->edit_current_room = 0;
+		game->room_index = 0;
 	}
 	if (key_pressed(GLFW_KEY_F5))
 	{
-		game->edit_current_room = 1;
+		game->room_index = 1;
 	}
 	if (key_pressed(GLFW_KEY_F6))
 	{
-		game->edit_current_room = 2;
+		game->room_index = 2;
 	}
 	if (key_pressed(GLFW_KEY_F7))
 	{
-		game->edit_current_room = 3;
+		game->room_index = 3;
 	}
 	if (key_pressed(GLFW_KEY_F8))
 	{
-		game->edit_current_room = 4;
+		game->room_index = 4;
 	}
 
 	if (key_pressed(GLFW_KEY_KP_0))
@@ -419,7 +486,7 @@ void room_edit()
 	}
 	if (key_pressed(GLFW_KEY_KP_1))
 	{
-		game->edit_current_type = TILE_WALL_BOTTOM;
+		game->edit_current_type = TILE_WALL_TOP;
 	}
 	if (key_pressed(GLFW_KEY_KP_2))
 	{
@@ -427,7 +494,7 @@ void room_edit()
 	}
 	if (key_pressed(GLFW_KEY_KP_3))
 	{
-		game->edit_current_type = TILE_WALL_TOP;
+		game->edit_current_type = TILE_WALL_BOTTOM;
 	}
 	if (key_pressed(GLFW_KEY_KP_4))
 	{
@@ -443,6 +510,7 @@ void room_edit()
 	}
 	if (key_pressed(GLFW_KEY_KP_7))
 	{
+		game->edit_current_type = TILE_STONEFLOOR;
 	}
 	if (key_pressed(GLFW_KEY_KP_8))
 	{
@@ -456,7 +524,7 @@ void room_edit()
 
 void game_think(struct core *core, struct graphics *g, float dt)
 {
-	room_edit();
+	room_edit(dt);
 
 	vec2 offset;
 	set2f(offset, 0.0f, 0.0f);
@@ -495,9 +563,13 @@ void game_render(struct core *core, struct graphics *g, float dt)
 
 void game_mousebutton_callback(struct core *core, GLFWwindow *window, int button, int action, int mods)
 {
-	if(action == GLFW_PRESS) {
+	if (action == GLFW_PRESS) {
 		float x = 0, y = 0;
 		input_view_get_cursor(window, &x, &y);
+		
+		x += game->camera[0];
+		y += game->camera[1];
+
 		console_debug("Click at %.0fx%.0f\n", x, y);
 	}
 }
@@ -505,21 +577,6 @@ void game_mousebutton_callback(struct core *core, GLFWwindow *window, int button
 void game_console_init(struct console *c)
 {
 	/* console_env_bind_1f(c, "print_fps", &(game->print_fps)); */
-}
-
-struct anim* tiles_get_back_data_at(float x, float y,
-	int tile_size, int grid_x_max, int grid_y_max)
-{
-	int grid_x = (int)floor(x / (float)tile_size);
-	int grid_y = (int)floor(y / (float)tile_size);
-
-	if (grid_x < 0 || grid_y < 0 || grid_x >= grid_x_max || grid_y >= grid_y_max) 
-	{
-		return 0;
-	}
-
-	int tile_index = grid_y * grid_x_max + grid_x;
-	return game->rooms[game->room_index].tiles[tile_index].tile_back;
 }
 
 struct anim* tiles_get_front_data_at(float x, float y,
@@ -548,13 +605,14 @@ void game_init()
 	animatedsprites_setanim(&game->tiles_cobble, 1, 19, 1, 100.0f);
 
 	animatedsprites_setanim(&game->tiles_wall_top, 1, 21, 1, 100.0f);
-	animatedsprites_setanim(&game->tiles_wall_mid, 1, 22, 1, 100.0f);
+	animatedsprites_setanim(&game->tiles_wall_mid, 20, 22, 1, 100.0f);
 	animatedsprites_setanim(&game->tiles_wall_bottom, 1, 23, 1, 100.0f);
+	animatedsprites_setanim(&game->tiles_stonefloor, 1, 24, 1, 100.0f);
 
 	tiles_init(&game->tiles_back, &tiles_get_back_data_at, 16, VIEW_WIDTH, VIEW_HEIGHT, 16, 16);
 	tiles_init(&game->tiles_front, &tiles_get_front_data_at, 16, VIEW_WIDTH, VIEW_HEIGHT, 16, 16);
 
-	game->edit_current_room = 0;
+	game->room_index = 0;
 	game->edit_current_type = TILE_NONE;
 
 	player_init(game);

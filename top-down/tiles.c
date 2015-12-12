@@ -66,7 +66,7 @@ void tiles_init(struct tiles *tiles, tiles_get_data_at_pixel_t get_data_at_pixel
 			}
 
 			/* FIXME: need a size parameter! Force 32x32 tiles... */
-			set2f(draw_tile->scale, 1.0725f, 1.0725f);
+			set2f(draw_tile->scale, 1.01f, 1.01f);
 
 			set3f(draw_tile->position,
 					(x-1) * tile_size + tile_size/2.0f,
