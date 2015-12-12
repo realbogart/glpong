@@ -26,6 +26,8 @@
 #define ROOM_SIZE		256
 #define NUM_ROOMS		5
 
+#define ROOMS_FILE_PATH	"C:/programmering/ld34/glpong/ld34/assets/allrooms.world"
+
 struct game_settings settings = {
 	.view_width			= VIEW_WIDTH,
 	.view_height		= VIEW_HEIGHT,
@@ -45,6 +47,17 @@ enum direction
 	DIR_LEFT,
 	DIR_UP,
 	DIR_DOWN
+};
+
+enum tile_type
+{
+	NONE = 0,
+	WOOD,
+	GRAIN,
+	COBBLE,
+	WALL_TOP,
+	WALL_MID,
+	WALL_BOTTOM
 };
 
 struct player{
@@ -67,8 +80,13 @@ struct player{
 
 struct room_tile
 {
-	struct anim* tile_back;
-	struct anim* tile_front;
+	enum tile_type	type_back;
+	enum tile_type	type_front;
+
+	int				extra_data[8];
+
+	struct anim*	tile_back;
+	struct anim*	tile_front;
 };
 
 struct room
@@ -79,7 +97,8 @@ struct room
 struct game {
 	struct atlas			atlas;
 	struct animatedsprites	*batcher;
-	struct tiles			tiles;
+	struct tiles			tiles_back;
+	struct tiles			tiles_front;
 
 	struct player			player;
 
@@ -93,8 +112,88 @@ struct game {
 	struct anim tiles_cobble;
 	struct anim tiles_grain;
 	struct anim tiles_wood;
-	//struct anim* tiles_data[NUM_TILES];
+	struct anim tiles_wall_top;
+	struct anim tiles_wall_mid;
+	struct anim tiles_wall_bottom;
 } *game = NULL;
+
+void room_setup_tile(struct game* game, int room_index, int tile_index, enum tile_type type, int back)
+{
+	struct anim** tile = back ? &game->rooms[room_index].tiles[tile_index].tile_back : 
+								&game->rooms[room_index].tiles[tile_index].tile_front;
+
+	if (back)
+	{
+		game->rooms[room_index].tiles[tile_index].type_back = type;
+	}
+	else
+	{
+		game->rooms[room_index].tiles[tile_index].type_front = type;
+	}
+
+	switch (type)
+	{
+		case WOOD:
+			*tile = &game->tiles_wood;
+			break;
+		case GRAIN:
+			*tile = &game->tiles_grain;
+			break;
+		case COBBLE:
+			*tile = &game->tiles_cobble;
+			break;
+		case WALL_TOP:
+			*tile = &game->tiles_wall_top;
+			break;
+		case WALL_MID:
+			*tile = &game->tiles_wall_mid;
+			break;
+		case WALL_BOTTOM:
+			*tile = &game->tiles_wall_bottom;
+			break;
+	}
+}
+
+void rooms_save(struct game* game)
+{
+	FILE *fp;
+	fp = fopen(ROOMS_FILE_PATH, "wb+");
+
+	for (int i = 0; i < NUM_ROOMS; i++)
+	{
+		for (int j = 0; j < ROOM_SIZE; j++)
+		{
+			fwrite(&game->rooms[i].tiles[j].type_back, sizeof(int), 1, fp);
+			fwrite(&game->rooms[i].tiles[j].type_front, sizeof(int), 1, fp);
+			fwrite(&game->rooms[i].tiles[j].extra_data, sizeof(int), 8, fp);
+		}
+	}
+
+	fclose(fp);
+}
+
+void rooms_load(struct game* game)
+{
+	FILE *fp;
+	fp = fopen(ROOMS_FILE_PATH, "rb");
+
+	for (int i = 0; i < NUM_ROOMS; i++)
+	{
+		for (int j = 0; j < ROOM_SIZE; j++)
+		{
+			enum tile_type type;
+
+			fread(&type, sizeof(int), 1, fp);
+			room_setup_tile(game, i, j, type, 1);
+
+			fread(&type, sizeof(int), 1, fp);
+			room_setup_tile(game, i, j, type, 0);
+
+			fread(game->rooms[i].tiles[j].extra_data, sizeof(int), 8, fp);
+		}
+	}
+	fclose(fp);
+}
 
 void rooms_init(struct game* game)
 {
@@ -102,8 +201,13 @@ void rooms_init(struct game* game)
 	{
 		for (int j = 0; j < ROOM_SIZE; j++)
 		{
-			game->rooms[i].tiles[j].tile_back = &game->tiles_wood;
-			game->rooms[i].tiles[j].tile_front = 0;
+			for (int k = 0; k < 8; k++)
+			{
+				game->rooms[i].tiles[j].extra_data[8] = 0;
+			}
+	
+			game->rooms[i].tiles[j].type_back = NONE;
+			game->rooms[i].tiles[j].type_front = NONE;
 		}
 	}
 }
@@ -256,8 +360,6 @@ void player_think(struct game* game, float dt)
 	game->player.state(game, dt);
 }
 
-
-
 struct game_settings* game_get_settings()
 {
 	return &settings;
@@ -278,6 +380,12 @@ void game_init_memory(struct shared_memory *shared_memory, int reload)
 
 void game_think(struct core *core, struct graphics *g, float dt)
 {
+	// Room save/load logic
+	if (key_pressed(GLFW_KEY_F9))
+	{
+		rooms_save(game);
+	}
+
 	vec2 offset;
 	set2f(offset, 0.0f, 0.0f);
 
@@ -290,7 +398,8 @@ void game_think(struct core *core, struct graphics *g, float dt)
 	game->camera[1] += dy;
 
 	animatedsprites_update(game->batcher, &game->atlas, dt);
-	tiles_think(&game->tiles, game->camera, &game->atlas, dt);
+	tiles_think(&game->tiles_back, game->camera, &game->atlas, dt);
+	tiles_think(&game->tiles_front, game->camera, &game->atlas, dt);
 	shader_uniforms_think(&assets->shaders.basic_shader, dt);
 }
 
@@ -307,8 +416,9 @@ void game_render(struct core *core, struct graphics *g, float dt)
 	translate(offset, -game->camera[0] + VIEW_WIDTH / 2, -game->camera[1] + VIEW_HEIGHT / 2, 0.0f);
 	transpose(final, offset);
 
-	tiles_render(&game->tiles, &assets->shaders.basic_shader, g, assets->textures.textures, transform);
+	tiles_render(&game->tiles_back, &assets->shaders.basic_shader, g, assets->textures.textures, transform);
 	animatedsprites_render(game->batcher, &assets->shaders.basic_shader, g, assets->textures.textures, final);
+	tiles_render(&game->tiles_front, &assets->shaders.basic_shader, g, assets->textures.textures, transform);
 }
 
 void game_mousebutton_callback(struct core *core, GLFWwindow *window, int button, int action, int mods)
@@ -340,21 +450,40 @@ struct anim* tiles_get_back_data_at(float x, float y,
 	return game->rooms[game->room_index].tiles[tile_index].tile_back;
 }
 
+struct anim* tiles_get_front_data_at(float x, float y,
+	int tile_size, int grid_x_max, int grid_y_max)
+{
+	int grid_x = (int)floor(x / (float)tile_size);
+	int grid_y = (int)floor(y / (float)tile_size);
+
+	if (grid_x < 0 || grid_y < 0 || grid_x >= grid_x_max || grid_y >= grid_y_max)
+	{
+		return 0;
+	}
+
+	int tile_index = grid_y * grid_x_max + grid_x;
+	return game->rooms[game->room_index].tiles[tile_index].tile_front;
+}
+
 void game_init()
 {
 	glClearColor(0.0f, 0.0f, 0.0f, 0.0f);
 	game->batcher = animatedsprites_create();
 
-	//setup_tiles(game);
 	animatedsprites_setanim(&game->tiles_grass, 1, 16, 1, 100.0f);
 	animatedsprites_setanim(&game->tiles_grain, 1, 17, 1, 100.0f);
 	animatedsprites_setanim(&game->tiles_wood, 1, 18, 1, 100.0f);
-
 	animatedsprites_setanim(&game->tiles_cobble, 1, 19, 1, 100.0f);
-	tiles_init(&game->tiles, &tiles_get_back_data_at, 16, VIEW_WIDTH, VIEW_HEIGHT, 16, 16);
 
-	player_init( game );
-	rooms_init( game );
+	animatedsprites_setanim(&game->tiles_wall_top, 1, 21, 1, 100.0f);
+	animatedsprites_setanim(&game->tiles_wall_mid, 1, 22, 1, 100.0f);
+	animatedsprites_setanim(&game->tiles_wall_bottom, 1, 23, 1, 100.0f);
+
+	tiles_init(&game->tiles_back, &tiles_get_back_data_at, 16, VIEW_WIDTH, VIEW_HEIGHT, 16, 16);
+	tiles_init(&game->tiles_front, &tiles_get_front_data_at, 16, VIEW_WIDTH, VIEW_HEIGHT, 16, 16);
+
+	player_init(game);
+	rooms_load(game);
 }
 
 void game_key_callback(struct core *core, struct input *input, GLFWwindow *window, int key,
