@@ -68,8 +68,8 @@ void game_think(struct core *core, struct graphics *g, float dt)
 {
 	vec2 offset;
 	set2f(offset, 0.0f, 0.0f);
-	tiles_think(&game->tiles, offset, &game->tiles, dt);
 
+	tiles_think(&game->tiles, offset, &game->atlas, dt);
 	animatedsprites_update(game->batcher, &game->atlas, dt);
 	shader_uniforms_think(&assets->shaders.basic_shader, dt);
 }
@@ -78,11 +78,17 @@ void game_render(struct core *core, struct graphics *g, float dt)
 {
 	glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
-	mat4 i;
-	identity(i);
+	mat4 transform;
+	identity(transform);
+	mat4 offset;
+	mat4 final;
 
-	tiles_render(&game->tiles, &assets->shaders.basic_shader, g, assets->textures.textures, i);
-	animatedsprites_render(game->batcher, &assets->shaders.basic_shader, g, assets->textures.textures, i);
+	set2f(offset, 0.0f, 0.0f);
+	translate(offset, roundf(-offset[0]), roundf(-offset[1]), 0.0f);
+	transpose(final, offset);
+
+	tiles_render(&game->tiles, &assets->shaders.basic_shader, g, assets->textures.textures, transform);
+	animatedsprites_render(game->batcher, &assets->shaders.basic_shader, g, assets->textures.textures, final);
 }
 
 void game_mousebutton_callback(struct core *core, GLFWwindow *window, int button, int action, int mods)
@@ -109,17 +115,16 @@ void setup_tiles()
 
 void game_init()
 {
-	//glClearColor(0.1f, 0.2f, 0.3f, 1.0f);
 	glClearColor(0.0f, 0.0f, 0.0f, 0.0f);
+
+	/* Create animated sprite batcher. */
+	game->batcher = animatedsprites_create();
 
 	/* Setup tiles */
 	animatedsprites_setanim(&game->tiles_grass, 1, 1, 1, 100.0f);
 
 	setup_tiles();
 	tiles_init(&game->tiles, &game->tiles_data, 16, VIEW_WIDTH, VIEW_HEIGHT, 64, 64);
-
-	/* Create animated sprite batcher. */
-	game->batcher = animatedsprites_create();
 
 	/* Create sprite animation. */
 	animatedsprites_setanim(&game->anim_sprite, 1, 0, 1, 300.0f);
