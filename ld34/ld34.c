@@ -115,7 +115,9 @@ struct player{
 	struct anim				anim_arms_walk_right;
 	struct anim				anim_arms_walk_up;
 	struct anim				anim_arms_walk_down;
+	struct anim				anim_die;
 
+	int						alive;
 	int						holding_item;
 
 	enum direction			dir;
@@ -160,6 +162,8 @@ struct game {
 	int						room_index;
 
 	enum tile_type			edit_current_type;
+
+	struct anim anim_empty;
 
 	struct anim tiles_grass;
 	struct anim tiles_cobble;
@@ -477,6 +481,11 @@ void player_try_pickup_drop()
 	}
 }
 
+void player_die(struct game* game, float dt)
+{
+	animatedsprites_switchanimation(&game->player.sprite, &game->player.anim_die);
+}
+
 void player_idle(struct game* game, float dt)
 {
 	int enter_walk = 0;
@@ -669,6 +678,7 @@ void player_init(struct game* game)
 	game->player.state = &player_idle;
 	game->player.dir = DIR_DOWN;
 	game->player.holding_item = 0;
+	game->player.alive = 1;
 
 	animatedsprites_setanim(&game->player.anim_idle_left, 1, 0, 2, 700.0f);
 	animatedsprites_setanim(&game->player.anim_idle_right, 1, 2, 2, 700.0f);
@@ -678,6 +688,7 @@ void player_init(struct game* game)
 	animatedsprites_setanim(&game->player.anim_walk_right, 1, 10, 2, 150.0f);
 	animatedsprites_setanim(&game->player.anim_walk_up, 1, 12, 2, 150.0f);
 	animatedsprites_setanim(&game->player.anim_walk_down, 1, 14, 2, 150.0f);
+	animatedsprites_setanim(&game->player.anim_die, 0, atlas_frame_index(&game->atlas, "player_die"), 8, 40.0f);
 
 	player_set_arms(0);
 
@@ -691,8 +702,28 @@ void player_init(struct game* game)
 
 void player_think(struct game* game, float dt)
 {
+	if (key_pressed(GLFW_KEY_P))
+	{
+		game->player.alive = 0;
+	}
+
+	if (!game->player.alive)
+	{
+		game->player.state = &player_die;
+		game->player.sprite_arms.position[0] = -99999.0f;
+
+		// TODO: Check for restart
+		if (key_pressed(GLFW_KEY_ENTER))
+		{
+			game_init();
+		}
+	}
+	else
+	{
+		set2f(game->player.sprite_arms.position, game->player.sprite.position[0], game->player.sprite.position[1]);
+	}
+
 	game->player.state(game, dt);
-	set2f(game->player.sprite_arms.position, game->player.sprite.position[0], game->player.sprite.position[1]);
 }
 
 struct game_settings* game_get_settings()
@@ -786,7 +817,7 @@ void room_edit(float dt)
 	{
 		room_edit_place_front(x, y);
 	}
-	if (key_down(GLFW_KEY_KP_ADD))
+	if (key_pressed(GLFW_KEY_KP_ADD))
 	{
 		room_edit_place_monster(x, y);
 	}
@@ -980,6 +1011,8 @@ void game_init()
 	animatedsprites_setanim(&game->tiles_wall_bottom, 1, 23, 1, 100.0f);
 	animatedsprites_setanim(&game->tiles_stonefloor, 1, 24, 1, 100.0f);
 	animatedsprites_setanim(&game->anim_debug, 1, 25, 1, 100.0f);
+
+	animatedsprites_setanim(&game->anim_empty, 0, atlas_frame_index(&game->atlas, "anim_empty"), 1, 100.0f);
 
 	tiles_init(&game->tiles_back, &tiles_get_back_data_at, 16, VIEW_WIDTH, VIEW_HEIGHT, 16, 16);
 	tiles_init(&game->tiles_front, &tiles_get_front_data_at, 16, VIEW_WIDTH, VIEW_HEIGHT, 16, 16);
