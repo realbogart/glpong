@@ -698,6 +698,16 @@ void player_try_pickup_drop()
 	}
 }
 
+void player_use_item()
+{
+	struct item* item = game->player.item;
+
+	if (item->type == ITEM_WEAPON)
+	{
+
+	}
+}
+
 void player_die(float dt)
 {
 	animatedsprites_switchanimation(&game->player.sprite, &game->player.anim_die);
@@ -781,6 +791,11 @@ void player_idle(float dt)
 		return;
 	}
 
+	if (key_pressed(GLFW_KEY_X))
+	{
+		player_use_item();
+	}
+
 	player_try_pickup_drop();
 
 	// Set correct idle animation
@@ -852,6 +867,11 @@ void player_walk(float dt)
 	{
 		game->player.dir = DIR_DOWN;
 		pos[1] -= game->player.speed * dt;
+	}
+
+	if (key_pressed(GLFW_KEY_X))
+	{
+		player_use_item();
 	}
 
 	player_try_pickup_drop();
