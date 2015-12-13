@@ -20,6 +20,7 @@
 #include "animatedsprites.h"
 #include "top-down\tiles.h"
 #include "collide.h"
+#include "drawable.h"
 #include "GLFW\glfw3.h"
 
 #define VIEW_WIDTH      256
@@ -154,6 +155,9 @@ struct game {
 	struct animatedsprites	*batcher;
 	struct animatedsprites	*batcher_statics;
 
+	struct drawable			drawable_monster;
+	struct drawable			drawable_player;
+
 	struct tiles			tiles_back;
 	struct tiles			tiles_front;
 
@@ -215,7 +219,7 @@ void monster_hunt(struct monster* monster, float dt)
 	vec2 check_right;
 	vec2 check_left;
 	vec2 check_back;
-	
+
 	float check_dist = 8.0f;
 
 	set2f(check_forward, monster->sprite.position[0], monster->sprite.position[1]);
@@ -332,12 +336,42 @@ void monster_hunt(struct monster* monster, float dt)
 		set2f(monster->sprite.position, pos[0], pos[1]);
 	}
 
+	drawable_new_circle_outlinef(&game->drawable_monster, monster->sprite.position[0], monster->sprite.position[1], 6.0f, 32, &assets->shaders.basic_shader);
+	drawable_new_circle_outlinef(&game->drawable_player, game->player.sprite.position[0], game->player.sprite.position[1] - 6.0f, 6.0f, 32, &assets->shaders.basic_shader);
+
 	// Check for player collision
-	if (collide_circlef(monster->sprite.position[0], monster->sprite.position[1], 3.0f, 
-						game->player.sprite.position[0], game->player.sprite.position[1], 3.0f))
+	if (collide_circlef(monster->sprite.position[0], monster->sprite.position[1], 6.0f, 
+						game->player.sprite.position[0], game->player.sprite.position[1] - 6.0f, 6.0f))
 	{
 		game->player.alive = 0;
 	}
+}
+
+void room_add_monster(int room_index, float x, float y)
+{
+	struct room* room = &game->rooms[room_index];
+
+	if (room->num_monsters >= MAX_MONSTERS)
+	{
+		return;
+	}
+
+	struct monster* monster = &room->monsters[room->num_monsters];
+
+	set2f(monster->sprite.position, x, y);
+	set2f(monster->sprite.scale, 0.8f, 0.8f);
+
+	monster->dir = DIR_LEFT;
+	monster->speed = 0.08f;
+	monster->state = &monster_hunt;
+	room->num_monsters++;
+
+	animatedsprites_setanim(&monster->anim_walk_left, 1, atlas_frame_index(&game->atlas, "monster_walk_left"), 2, 100.0f);
+	animatedsprites_setanim(&monster->anim_walk_right, 1, atlas_frame_index(&game->atlas, "monster_walk_right"), 2, 100.0f);
+	animatedsprites_setanim(&monster->anim_walk_up, 1, atlas_frame_index(&game->atlas, "monster_walk_up"), 2, 100.0f);
+	animatedsprites_setanim(&monster->anim_walk_down, 1, atlas_frame_index(&game->atlas, "monster_walk_down"), 2, 100.0f);
+
+	animatedsprites_add(game->batcher, &monster->sprite);
 }
 
 void room_setup_tile(struct game* game, int room_index, int tile_index, enum tile_type type, int back)
@@ -407,6 +441,27 @@ void rooms_save(struct game* game)
 	fclose(fp);
 }
 
+void room_setup_extra_data(int room_index, int tile_index)
+{
+	struct room_tile* tile = &game->rooms[room_index].tiles[tile_index];
+
+	for (int i = 0; i < 8; i++)
+	{
+		switch (tile->extra_data[i])
+		{
+		case EXTRA_DATA_MONSTER:
+		{
+			float x = *((float*)&tile->extra_data[i + 1]);
+			float y = *((float*)&tile->extra_data[i + 2]);
+			i += 2;
+
+			room_add_monster(room_index, x, y);
+		}
+			break;
+		}
+	}
+}
+
 void rooms_load(struct game* game)
 {
 	FILE *fp;
@@ -416,45 +471,20 @@ void rooms_load(struct game* game)
 	{
 		for (int j = 0; j < ROOM_SIZE; j++)
 		{
-			enum tile_type type;
+			enum tile_type type_back;
+			enum tile_type type_front;
 
-			fread(&type, sizeof(int), 1, fp);
-			room_setup_tile(game, i, j, type, 1);
-
-			fread(&type, sizeof(int), 1, fp);
-			room_setup_tile(game, i, j, type, 0);
+			fread(&type_back, sizeof(int), 1, fp);
+			fread(&type_front, sizeof(int), 1, fp);
 
 			fread(game->rooms[i].tiles[j].extra_data, sizeof(int), 8, fp);
+
+			room_setup_tile(game, i, j, type_back, 1);
+			room_setup_tile(game, i, j, type_front, 0);
+			room_setup_extra_data(i, j);
 		}
 	}
 	fclose(fp);
-}
-
-void room_add_monster(int room_index, float x, float y)
-{
-	struct room* room = &game->rooms[room_index];
-
-	if (room->num_monsters >= MAX_MONSTERS)
-	{
-		return;
-	}
-
-	struct monster* monster = &room->monsters[room->num_monsters];
-
-	set2f(monster->sprite.position, x, y);
-	set2f(monster->sprite.scale, 0.8f, 0.8f);
-
-	monster->dir = DIR_LEFT;
-	monster->speed = 0.08f;
-	monster->state = &monster_hunt;
-	room->num_monsters++;
-
-	animatedsprites_setanim(&monster->anim_walk_left, 1, atlas_frame_index(&game->atlas, "monster_walk_left"), 2, 100.0f);
-	animatedsprites_setanim(&monster->anim_walk_right, 1, atlas_frame_index(&game->atlas, "monster_walk_right"), 2, 100.0f);
-	animatedsprites_setanim(&monster->anim_walk_up, 1, atlas_frame_index(&game->atlas, "monster_walk_up"), 2, 100.0f);
-	animatedsprites_setanim(&monster->anim_walk_down, 1, atlas_frame_index(&game->atlas, "monster_walk_down"), 2, 100.0f);
-
-	animatedsprites_add(game->batcher, &monster->sprite);
 }
 
 void rooms_init(struct game* game)
@@ -802,10 +832,14 @@ void room_edit_place_monster(float x, float y)
 {
 	int index = 0;
 	struct room_tile* tile = get_room_tile_at(x, y, 16, 16, 16, &index);
-	tile->extra_data[0] = EXTRA_DATA_MONSTER;
 
 	vec2 offset;
 	set2f(offset, x - VIEW_WIDTH / 2, y - VIEW_HEIGHT / 2);
+
+	tile->extra_data[0] = EXTRA_DATA_MONSTER;
+	*((float*)&tile->extra_data[1]) = offset[0];
+	*((float*)&tile->extra_data[2]) = offset[1];
+
 	room_add_monster(game->room_index, offset[0], offset[1]);
 }
 
@@ -974,6 +1008,11 @@ void game_render(struct core *core, struct graphics *g, float dt)
 	tiles_render(&game->tiles_back, &assets->shaders.basic_shader, g, assets->textures.textures, transform);
 	animatedsprites_render(game->batcher, &assets->shaders.basic_shader, g, assets->textures.textures, final);
 	tiles_render(&game->tiles_front, &assets->shaders.basic_shader, g, assets->textures.textures, transform);
+
+	vec4 c;
+	set4f(c, 1.0f, 1.0f, 1.0f, 1.0f);
+	drawable_render(&game->drawable_player, &assets->shaders.basic_shader, g, &core->textures.none, c, final);
+	drawable_render(&game->drawable_monster, &assets->shaders.basic_shader, g, &core->textures.none, c, final);
 
 	animatedsprites_render(game->batcher_statics, &assets->shaders.basic_shader, g, assets->textures.killscreen, transform);
 }
