@@ -65,15 +65,25 @@ enum tile_type
 
 struct player{
 	struct sprite			sprite;
+	struct sprite			sprite_arms;
+
 	struct anim				anim_idle_left;
 	struct anim				anim_idle_right;
 	struct anim				anim_idle_up;
 	struct anim				anim_idle_down;
-
 	struct anim				anim_walk_left;
 	struct anim				anim_walk_right;
 	struct anim				anim_walk_up;
 	struct anim				anim_walk_down;
+
+	struct anim				anim_arms_idle_left;
+	struct anim				anim_arms_idle_right;
+	struct anim				anim_arms_idle_up;
+	struct anim				anim_arms_idle_down;
+	struct anim				anim_arms_walk_left;
+	struct anim				anim_arms_walk_right;
+	struct anim				anim_arms_walk_up;
+	struct anim				anim_arms_walk_down;
 
 	enum direction			dir;
 
@@ -272,16 +282,28 @@ void player_idle(struct game* game, float dt)
 	switch (game->player.dir)
 	{
 	case DIR_LEFT:
-		animatedsprites_switchanimation(&game->player, &game->player.anim_idle_left);
+	{
+		animatedsprites_switchanimation(&game->player.sprite, &game->player.anim_idle_left);
+		animatedsprites_switchanimation(&game->player.sprite_arms, &game->player.anim_arms_idle_left);
+	}
 		break;
 	case DIR_RIGHT:
-		animatedsprites_switchanimation(&game->player, &game->player.anim_idle_right);
+	{
+		animatedsprites_switchanimation(&game->player.sprite, &game->player.anim_idle_right);
+		animatedsprites_switchanimation(&game->player.sprite_arms, &game->player.anim_arms_idle_right);
+	}
 		break;
 	case DIR_UP:
-		animatedsprites_switchanimation(&game->player, &game->player.anim_idle_up);
+	{
+		animatedsprites_switchanimation(&game->player.sprite, &game->player.anim_idle_up);
+		animatedsprites_switchanimation(&game->player.sprite_arms, &game->player.anim_arms_idle_up);
+	}
 		break;
 	case DIR_DOWN:
-		animatedsprites_switchanimation(&game->player, &game->player.anim_idle_down);
+	{
+		animatedsprites_switchanimation(&game->player.sprite, &game->player.anim_idle_down);
+		animatedsprites_switchanimation(&game->player.sprite_arms, &game->player.anim_arms_idle_down);
+	}
 		break;
 	}
 }
@@ -355,22 +377,26 @@ void player_walk(struct game* game, float dt)
 	{
 	case DIR_LEFT:
 	{
-		animatedsprites_switchanimation(&game->player, &game->player.anim_walk_left);
+		animatedsprites_switchanimation(&game->player.sprite, &game->player.anim_walk_left);
+		animatedsprites_switchanimation(&game->player.sprite_arms, &game->player.anim_arms_walk_left);
 	}
 		break;
 	case DIR_RIGHT:
 	{
-		animatedsprites_switchanimation(&game->player, &game->player.anim_walk_right);
+		animatedsprites_switchanimation(&game->player.sprite, &game->player.anim_walk_right);
+		animatedsprites_switchanimation(&game->player.sprite_arms, &game->player.anim_arms_walk_right);
 	}
 		break;
 	case DIR_UP:
 	{
-		animatedsprites_switchanimation(&game->player, &game->player.anim_walk_up);
+		animatedsprites_switchanimation(&game->player.sprite, &game->player.anim_walk_up);
+		animatedsprites_switchanimation(&game->player.sprite_arms, &game->player.anim_arms_walk_up);
 	}
 		break;
 	case DIR_DOWN:
 	{
-		animatedsprites_switchanimation(&game->player, &game->player.anim_walk_down);
+		animatedsprites_switchanimation(&game->player.sprite, &game->player.anim_walk_down);
+		animatedsprites_switchanimation(&game->player.sprite_arms, &game->player.anim_arms_walk_down);
 	}
 		break;
 	}
@@ -400,7 +426,9 @@ void player_init(struct game* game)
 {
 	set3f(game->player.sprite.position, -69.0f, -12.0f, 0);
 	set3f(game->camera, -69.0f, -12.0f, 0);
+
 	set2f(game->player.sprite.scale, 1.3f, 1.3f);
+	set2f(game->player.sprite_arms.scale, 1.3f, 1.3f);
 
 	game->player.speed = 0.04f;
 	game->player.state = &player_idle;
@@ -410,22 +438,32 @@ void player_init(struct game* game)
 	animatedsprites_setanim(&game->player.anim_idle_right, 1, 2, 2, 700.0f);
 	animatedsprites_setanim(&game->player.anim_idle_up, 1, 4, 2, 700.0f);
 	animatedsprites_setanim(&game->player.anim_idle_down, 1, 6, 2, 700.0f);
-
 	animatedsprites_setanim(&game->player.anim_walk_left, 1, 8, 2, 150.0f);
 	animatedsprites_setanim(&game->player.anim_walk_right, 1, 10, 2, 150.0f);
 	animatedsprites_setanim(&game->player.anim_walk_up, 1, 12, 2, 150.0f);
 	animatedsprites_setanim(&game->player.anim_walk_down, 1, 14, 2, 150.0f);
 
-	animatedsprites_playanimation(&game->player.sprite, &game->player.anim_idle_left);
+	animatedsprites_setanim(&game->player.anim_arms_idle_left, 1, atlas_frame_index(&game->atlas, "arms_left"), 2, 700.0f);
+	animatedsprites_setanim(&game->player.anim_arms_idle_right, 1, atlas_frame_index(&game->atlas, "arms_right"), 2, 700.0f);
+	animatedsprites_setanim(&game->player.anim_arms_idle_up, 1, atlas_frame_index(&game->atlas, "arms_up"), 2, 700.0f);
+	animatedsprites_setanim(&game->player.anim_arms_idle_down, 1, atlas_frame_index(&game->atlas, "arms_down"), 2, 700.0f);
+	animatedsprites_setanim(&game->player.anim_arms_walk_left, 1, atlas_frame_index(&game->atlas, "arms_left"), 2, 150.0f);
+	animatedsprites_setanim(&game->player.anim_arms_walk_right, 1, atlas_frame_index(&game->atlas, "arms_right"), 2, 150.0f);
+	animatedsprites_setanim(&game->player.anim_arms_walk_up, 1, atlas_frame_index(&game->atlas, "arms_up"), 2, 150.0f);
+	animatedsprites_setanim(&game->player.anim_arms_walk_down, 1, atlas_frame_index(&game->atlas, "arms_down"), 2, 150.0f);
+
 	animatedsprites_playanimation(&game->debug_pos, &game->anim_debug);
+
 	animatedsprites_add(game->batcher, &game->player.sprite);
-	
+	animatedsprites_add(game->batcher, &game->player.sprite_arms);
+
 	//animatedsprites_add(game->batcher, &game->debug_pos);
 }
 
 void player_think(struct game* game, float dt)
 {
 	game->player.state(game, dt);
+	set2f(game->player.sprite_arms.position, game->player.sprite.position[0], game->player.sprite.position[1]);
 }
 
 struct game_settings* game_get_settings()
