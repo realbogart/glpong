@@ -64,7 +64,8 @@ enum tile_type
 	TILE_WALL_MID,
 	TILE_WALL_BOTTOM,
 	TILE_STONEFLOOR,
-	TILE_CLEAR_EXTRA
+	TILE_CLEAR_EXTRA,
+	TILE_SWITCH_ROOM
 };
 
 enum extra_data
@@ -148,6 +149,13 @@ struct room
 	int					num_monsters;
 };
 
+struct door
+{
+	int to_room_index;
+	float x;
+	float y;
+};
+
 struct game {
 	struct sprite			debug_pos;
 	struct basic_sprite		sprite_killscreen;
@@ -169,10 +177,12 @@ struct game {
 	vec2					camera;
 
 	struct room				rooms[NUM_ROOMS];
+	struct door				doors[16];
 
 	int						room_index;
 
 	enum tile_type			edit_current_type;
+	float					edit_current_door;
 
 	struct anim anim_empty;
 
@@ -184,6 +194,8 @@ struct game {
 	struct anim tiles_wall_top;
 	struct anim tiles_wall_mid;
 	struct anim tiles_wall_bottom;
+	struct anim tiles_switch_room;
+
 } *game = NULL;
 
 struct room_tile* get_room_tile_at(float x, float y, int tile_size, int grid_x_max, int grid_y_max, int* tile_index_out);
@@ -200,7 +212,7 @@ int is_tile_collision(struct game* game, float x, float y)
 
 	if (index != -1)
 	{
-		if (tile->type_back != TILE_STONEFLOOR)
+		if (tile->type_back != TILE_STONEFLOOR && tile->type_back != TILE_SWITCH_ROOM)
 		{
 			return 1;
 		}
@@ -211,6 +223,30 @@ int is_tile_collision(struct game* game, float x, float y)
 	}
 
 	return 1;
+}
+
+int is_switch_room(float x, float y, int* door_id_out)
+{
+	x += VIEW_WIDTH / 2;
+	y += VIEW_HEIGHT / 2;
+
+	int index = -1;
+	struct room_tile* tile = get_room_tile_at(x, y, 16, 16, 16, &index);
+
+	if (index != -1)
+	{
+		if (tile->type_back == TILE_SWITCH_ROOM)
+		{
+			*door_id_out = tile->extra_data[1];
+			return 1;
+		}
+		else
+		{
+			return 0;
+		}
+	}
+
+	return 0;
 }
 
 void monster_die(struct monster* monster, float dt)
@@ -442,6 +478,11 @@ void room_setup_tile(struct game* game, int room_index, int tile_index, enum til
 			*tile = &game->tiles_stonefloor;
 		}
 			break;
+		case TILE_SWITCH_ROOM:
+		{
+			*tile = &game->tiles_switch_room;
+		}
+			break;
 	}
 }
 
@@ -547,6 +588,24 @@ void player_try_pickup_drop()
 void player_die(struct game* game, float dt)
 {
 	animatedsprites_switchanimation(&game->player.sprite, &game->player.anim_die);
+}
+
+void switch_room(int room_index, float x, float y)
+{
+	game->room_index = room_index;
+
+	animatedsprites_clear(game->batcher);
+
+	set3f(game->player.sprite.position, x, y, 0);
+	set3f(game->camera, x, y, 0);
+
+	animatedsprites_add(game->batcher, &game->player.sprite);
+	animatedsprites_add(game->batcher, &game->player.sprite_arms);
+
+	for (int i = 0; i < game->rooms[room_index].num_monsters; i++)
+	{
+		animatedsprites_add(game->batcher, &game->rooms[room_index].monsters[i].sprite);
+	}
 }
 
 void player_idle(struct game* game, float dt)
@@ -698,6 +757,13 @@ void player_walk(struct game* game, float dt)
 	{
 		set2f(game->player.sprite.position, game->player.sprite.position[0], pos[1]);
 	}
+
+	int door_id = -1;
+	if (is_switch_room(game->player.sprite.position[0], game->player.sprite.position[1] - 6.0f, &door_id))
+	{
+		struct door* door = &game->doors[door_id];
+		switch_room(door->to_room_index, door->x, door->y);
+	}
 }
 
 void player_set_arms(int hold)
@@ -731,9 +797,6 @@ void player_set_arms(int hold)
 
 void player_init(struct game* game)
 {
-	set3f(game->player.sprite.position, -69.0f, -12.0f, 0);
-	set3f(game->camera, -69.0f, -12.0f, 0);
-
 	set2f(game->player.sprite.scale, 1.3f, 1.3f);
 	set2f(game->player.sprite_arms.scale, 1.3f, 1.3f);
 
@@ -817,21 +880,6 @@ struct anim* tiles_get_back_data_at(float x, float y,
 	return game->rooms[game->room_index].tiles[tile_index].tile_back;
 }
 
-void switch_room(int room_index)
-{
-	game->room_index = room_index;
-
-	animatedsprites_clear(game->batcher);
-
-	animatedsprites_add(game->batcher, &game->player.sprite);
-	animatedsprites_add(game->batcher, &game->player.sprite_arms);
-
-	for (int i = 0; i < game->rooms[room_index].num_monsters; i++)
-	{
-		animatedsprites_add(game->batcher, &game->rooms[room_index].monsters[i].sprite);
-	}
-}
-
 struct room_tile* get_room_tile_at(float x, float y, int tile_size, int grid_x_max, int grid_y_max, int* tile_index_out)
 {
 	int grid_x = (int)floor(x / (float)tile_size);
@@ -875,6 +923,21 @@ void room_edit_place_monster(float x, float y)
 	room_add_monster(game->room_index, offset[0], offset[1]);
 }
 
+void room_edit_place_door(float x, float y)
+{
+	int index = 0;
+	struct room_tile* tile = get_room_tile_at(x, y, 16, 16, 16, &index);
+
+	tile->type_back = TILE_SWITCH_ROOM;
+	tile->tile_back = &game->tiles_switch_room;
+	tile->extra_data[0] = EXTRA_DATA_DOOR;
+
+	struct door* door = &game->doors[(int)game->edit_current_door];
+	tile->extra_data[2] = door->to_room_index;
+	*((float*)&tile->extra_data[2]) = door->x;
+	*((float*)&tile->extra_data[3]) = door->y;
+}
+
 void room_edit(float dt)
 {
 	int left_mouse = glfwGetMouseButton(core_global->graphics.window, GLFW_MOUSE_BUTTON_LEFT);
@@ -899,6 +962,11 @@ void room_edit(float dt)
 		room_edit_place_monster(x, y);
 	}
 
+	if (key_pressed(GLFW_KEY_INSERT))
+	{
+		room_edit_place_door(x, y);
+	}
+
 	// Room save/load logic
 	if (key_pressed(GLFW_KEY_F9))
 	{
@@ -907,23 +975,23 @@ void room_edit(float dt)
 
 	if (key_pressed(GLFW_KEY_F4))
 	{
-		switch_room(0);
+		switch_room(0, 0.0f, 0.0f);
 	}
 	if (key_pressed(GLFW_KEY_F5))
 	{
-		switch_room(1);
+		switch_room(1, 0.0f, 0.0f);
 	}
 	if (key_pressed(GLFW_KEY_F6))
 	{
-		switch_room(2);
+		switch_room(2, 0.0f, 0.0f);
 	}
 	if (key_pressed(GLFW_KEY_F7))
 	{
-		switch_room(3);
+		switch_room(3, 0.0f, 0.0f);
 	}
 	if (key_pressed(GLFW_KEY_F8))
 	{
-		switch_room(4);
+		switch_room(4, 0.0f, 0.0f);
 	}
 
 	if (key_pressed(GLFW_KEY_KP_0))
@@ -1072,7 +1140,7 @@ void game_mousebutton_callback(struct core *core, GLFWwindow *window, int button
 
 void game_console_init(struct console *c)
 {
-	/* console_env_bind_1f(c, "print_fps", &(game->print_fps)); */
+	console_env_bind_1f(c, "room_id", &(game->edit_current_door));
 }
 
 struct anim* tiles_get_front_data_at(float x, float y,
@@ -1090,12 +1158,20 @@ struct anim* tiles_get_front_data_at(float x, float y,
 	return game->rooms[game->room_index].tiles[tile_index].tile_front;
 }
 
+void doors_init()
+{
+	game->doors[0].to_room_index = 1;
+	game->doors[0].x = 100.0f;
+	game->doors[0].y = 100.0f;
+}
+
 void game_init()
 {
 	glClearColor(0.0f, 0.0f, 0.0f, 0.0f);
 	game->batcher = animatedsprites_create();
 	game->batcher_statics = animatedsprites_create();
 
+	game->edit_current_door = 0;
 	animatedsprites_setanim(&game->tiles_grass, 1, 16, 1, 100.0f);
 	animatedsprites_setanim(&game->tiles_grain, 1, 17, 1, 100.0f);
 	animatedsprites_setanim(&game->tiles_wood, 1, 18, 1, 100.0f);
@@ -1107,6 +1183,7 @@ void game_init()
 	animatedsprites_setanim(&game->tiles_stonefloor, 1, 24, 1, 100.0f);
 	animatedsprites_setanim(&game->anim_debug, 1, 25, 1, 100.0f);
 
+	animatedsprites_setanim(&game->tiles_switch_room, 1, atlas_frame_index(&game->atlas, "switch_room"), 1, 100.0f);
 	animatedsprites_setanim(&game->anim_empty, 0, atlas_frame_index(&game->atlas, "anim_empty"), 1, 100.0f);
 
 	tiles_init(&game->tiles_back, &tiles_get_back_data_at, 16, VIEW_WIDTH, VIEW_HEIGHT, 16, 16);
@@ -1128,8 +1205,9 @@ void game_init()
 	rooms_load(game);
 
 	monsters_init();
+	doors_init();
 
-	switch_room(0);
+	switch_room(0, -69.0f, -12.0f);
 }
 
 void game_key_callback(struct core *core, struct input *input, GLFWwindow *window, int key,
