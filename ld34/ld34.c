@@ -1167,6 +1167,14 @@ void doors_init()
 	game->doors[1].to_room_index = 0;
 	game->doors[1].x = -96.0f;
 	game->doors[1].y = 25.0f;
+
+	game->doors[2].to_room_index = 2;
+	game->doors[2].x = -90.0f;
+	game->doors[2].y = 160.0f;
+
+	game->doors[3].to_room_index = 0;
+	game->doors[3].x = -7.0f;
+	game->doors[3].y = -30.0f;
 }
 
 void game_init()
