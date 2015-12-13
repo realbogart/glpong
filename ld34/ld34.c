@@ -171,30 +171,157 @@ struct game {
 	struct anim tiles_wall_bottom;
 } *game = NULL;
 
+struct room_tile* get_room_tile_at(float x, float y, int tile_size, int grid_x_max, int grid_y_max, int* tile_index_out);
+void room_edit_place_front(float x, float y);
+void room_edit_place_back(float x, float y);
+
+int is_tile_collision(struct game* game, float x, float y)
+{
+	x += VIEW_WIDTH / 2;
+	y += VIEW_HEIGHT / 2;
+
+	int index = -1;
+	struct room_tile* tile = get_room_tile_at(x, y, 16, 16, 16, &index);
+
+	if (index != -1)
+	{
+		if (tile->type_back != TILE_STONEFLOOR)
+		{
+			return 1;
+		}
+		else
+		{
+			return 0;
+		}
+	}
+
+	return 1;
+}
+
 void monster_hunt(struct monster* monster, float dt)
 {
+	vec2 pos;
+	set2f(pos, monster->sprite.position[0], monster->sprite.position[1]);
+
+	vec2 check_forward;
+	vec2 check_right;
+	vec2 check_left;
+	vec2 check_back;
+	
+	float check_dist = 8.0f;
+
+	set2f(check_forward, monster->sprite.position[0], monster->sprite.position[1]);
+	set2f(check_left, monster->sprite.position[0], monster->sprite.position[1]);
+	set2f(check_right, monster->sprite.position[0], monster->sprite.position[1]);
+	set2f(check_back, monster->sprite.position[0], monster->sprite.position[1]);
+
+	enum new_dir right = -1;
+	enum new_dir left = -1;
+	enum new_dir back = -1;
+
 	switch (monster->dir)
 	{
 	case DIR_LEFT:
 	{
 		animatedsprites_switchanimation(&monster->sprite, &monster->anim_walk_left);
+		pos[0] -= monster->speed * dt;
+
+		right = DIR_UP;
+		left = DIR_DOWN;
+		back = DIR_RIGHT;
+
+		check_forward[0] -= check_dist;
+		check_back[0] += check_dist;
+		check_right[1] += check_dist;
+		check_left[1] -= check_dist;
 	}
 		break;
 	case DIR_RIGHT:
 	{
 		animatedsprites_switchanimation(&monster->sprite, &monster->anim_walk_right);
+		pos[0] += monster->speed * dt;
+
+		right = DIR_DOWN;
+		left = DIR_UP;
+		back = DIR_LEFT;
+
+		check_forward[0] += check_dist;
+		check_back[0] -= check_dist;
+		check_right[1] -= check_dist;
+		check_left[1] += check_dist;
 	}
 		break;
 	case DIR_UP:
 	{
 		animatedsprites_switchanimation(&monster->sprite, &monster->anim_walk_up);
+		pos[1] += monster->speed * dt;
+
+		right = DIR_RIGHT;
+		left = DIR_LEFT;
+		back = DIR_DOWN;
+
+		check_forward[1] += check_dist;
+		check_back[1] -= check_dist;
+		check_right[0] += check_dist;
+		check_left[0] -= check_dist;
 	}
 		break;
 	case DIR_DOWN:
 	{
 		animatedsprites_switchanimation(&monster->sprite, &monster->anim_walk_down);
+		pos[1] -= monster->speed * dt;
+
+		right = DIR_LEFT;
+		left = DIR_RIGHT;
+		back = DIR_UP;
+
+		check_forward[1] -= check_dist;
+		check_back[1] += check_dist;
+		check_right[0] -= check_dist;
+		check_left[0] += check_dist;
 	}
 		break;
+	}
+
+	int path_free = 1;
+
+	if (is_tile_collision(game, check_forward[0], check_forward[1]))
+	{
+		int r = !is_tile_collision(game, check_right[0], check_right[1]);
+		int l = !is_tile_collision(game, check_left[0], check_left[1]);
+
+		if (r && l)
+		{
+			if (rand() % 2 == 0)
+			{
+				monster->dir = right;
+			}
+			else
+			{
+				monster->dir = left;
+			}
+		}
+		else if (r)
+		{
+			monster->dir = right;
+		}
+		else if (l)
+		{
+			monster->dir = left;
+		}
+		else if (!is_tile_collision(game, check_back[0], check_back[1]))
+		{
+			monster->dir = back;
+		}
+		else
+		{
+			path_free = 0;
+		}
+	}
+
+	if (path_free)
+	{
+		set2f(monster->sprite.position, pos[0], pos[1]);
 	}
 }
 
@@ -410,33 +537,6 @@ void player_idle(struct game* game, float dt)
 		}
 		break;
 	}
-}
-
-struct room_tile* get_room_tile_at(float x, float y, int tile_size, int grid_x_max, int grid_y_max, int* tile_index_out);
-void room_edit_place_front(float x, float y);
-void room_edit_place_back(float x, float y);
-
-int is_tile_collision(struct game* game, float x, float y)
-{
-	x += VIEW_WIDTH / 2;
-	y += VIEW_HEIGHT / 2;
-
-	int index = -1;
-	struct room_tile* tile = get_room_tile_at(x, y, 16, 16, 16, &index);
-
-	if (index != -1)
-	{
-		if (tile->type_back != TILE_STONEFLOOR)
-		{
-			return 1;
-		}
-		else
-		{
-			return 0;
-		}
-	}
-
-	return 1;
 }
 
 void player_walk(struct game* game, float dt)
