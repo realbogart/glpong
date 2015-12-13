@@ -82,6 +82,21 @@ void atlas_print(struct atlas *atlas)
 
 #define ATLAS_TRY(e) if((ret = e) != ATLAS_OK) goto bail
 
+int atlas_frame_index(struct atlas *atlas, const char *name)
+{
+	for (int i = 0; i < atlas->frames_count; i++)
+	{
+		if (str_equals(atlas->frames[i].name, name))
+		{
+			return i;
+		}
+	}
+
+	atlas_debug("Could not find frame \"%s\"\n", name);
+	
+	return -1;
+}
+
 int atlas_load(struct atlas *atlas, void *data, size_t data_len)
 {
 	int ret = 0;
@@ -133,9 +148,9 @@ int atlas_load(struct atlas *atlas, void *data, size_t data_len)
 		ATLAS_TRY(atlas_parse_int(&f->rotated, elem, "rotated"));
 		ATLAS_TRY(atlas_parse_int(&f->trimmed, elem, "trimmed"));
 
-#ifdef ATLAS_FATTY
 		ATLAS_TRY(atlas_parse_str(f->name, elem, "filename"));
 
+#ifdef ATLAS_FATTY
 		/* "sourceSize" leaf. */
 		cJSON *elem_src = cJSON_GetObjectItem(elem, "sourceSize");
 		ATLAS_TRY(atlas_parse_int(&f->src_size_w, elem_src, "w"));
