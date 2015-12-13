@@ -27,7 +27,7 @@
 
 #define ROOM_SIZE		256
 #define NUM_ROOMS		5
-#define MAX_MONSTERS	32
+#define MAX_MONSTERS	1024
 
 #define ROOMS_FILE_PATH	"C:/programmering/ld34/glpong/ld34/assets/allrooms.world"
 
@@ -427,10 +427,10 @@ void room_add_monster(int room_index, float x, float y)
 	struct monster* monster = &room->monsters[room->num_monsters];
 
 	set2f(monster->sprite.position, x, y);
-	set2f(monster->sprite.scale, 1.3f, 1.3f);
+	set2f(monster->sprite.scale, 0.8f, 0.8f);
 
 	monster->dir = DIR_LEFT;
-	monster->speed = 0.1f;
+	monster->speed = 0.08f;
 	monster->state = &monster_hunt;
 	room->num_monsters++;
 
@@ -786,7 +786,7 @@ void room_edit(float dt)
 	{
 		room_edit_place_front(x, y);
 	}
-	if (key_pressed(GLFW_KEY_KP_ADD))
+	if (key_down(GLFW_KEY_KP_ADD))
 	{
 		room_edit_place_monster(x, y);
 	}
