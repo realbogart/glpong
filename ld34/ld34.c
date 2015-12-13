@@ -44,8 +44,7 @@ struct game_settings settings = {
 	.sound_distance_max = 500.0f, // distance3f(vec3(0), sound_listener)
 };
 
-struct game;
-typedef void(*player_state_t)(struct game*, float);
+typedef void(*player_state_t)(float);
 typedef void(*monster_state_t)(struct monster* monster, float);
 
 enum direction
@@ -107,8 +106,7 @@ struct item
 	enum item_type	type;
 	struct sprite	sprite;
 	struct anim		anim;
-
-	int held;
+	int	room_id;
 };
 
 struct player{
@@ -144,8 +142,7 @@ struct player{
 	struct anim				anim_die;
 
 	int						alive;
-	int						holding_item;
-	enum item_type			item;
+	struct item*			item;
 
 	enum direction			dir;
 
@@ -168,9 +165,7 @@ struct room
 {
 	struct room_tile	tiles[ROOM_SIZE];
 	struct monster		monsters[MAX_MONSTERS];
-	struct item			items[MAX_ITEMS];
 	int					num_monsters;
-	int					num_items;
 };
 
 struct door
@@ -179,6 +174,12 @@ struct door
 	float x;
 	float y;
 };
+
+struct world_items
+{
+	int			num_items;
+	struct item	items[MAX_ITEMS];
+} world_items;
 
 struct game {
 	struct sprite			debug_pos;
@@ -225,8 +226,9 @@ struct game {
 struct room_tile* get_room_tile_at(float x, float y, int tile_size, int grid_x_max, int grid_y_max, int* tile_index_out);
 void room_edit_place_front(float x, float y);
 void room_edit_place_back(float x, float y);
+void refresh_sprites();
 
-int is_tile_collision(struct game* game, float x, float y)
+int is_tile_collision(float x, float y)
 {
 	x += VIEW_WIDTH / 2;
 	y += VIEW_HEIGHT / 2;
@@ -365,10 +367,10 @@ void monster_hunt(struct monster* monster, float dt)
 
 	int path_free = 1;
 
-	if (is_tile_collision(game, check_forward[0], check_forward[1]))
+	if (is_tile_collision(check_forward[0], check_forward[1]))
 	{
-		int r = !is_tile_collision(game, check_right[0], check_right[1]);
-		int l = !is_tile_collision(game, check_left[0], check_left[1]);
+		int r = !is_tile_collision(check_right[0], check_right[1]);
+		int l = !is_tile_collision(check_left[0], check_left[1]);
 
 		if (r && l)
 		{
@@ -389,7 +391,7 @@ void monster_hunt(struct monster* monster, float dt)
 		{
 			monster->dir = left;
 		}
-		else if (!is_tile_collision(game, check_back[0], check_back[1]))
+		else if (!is_tile_collision(check_back[0], check_back[1]))
 		{
 			monster->dir = back;
 		}
@@ -415,38 +417,42 @@ void monster_hunt(struct monster* monster, float dt)
 	}
 }
 
-void room_add_item(int room_index, enum item_type type, float x, float y)
+void game_add_item(enum item_type type, int room_id, float x, float y)
 {
-	struct room* room = &game->rooms[room_index];
-
-	if (room->num_items >= MAX_ITEMS)
+	if (world_items.num_items >= MAX_ITEMS)
 	{
 		return;
 	}
 
-	struct item* item = &room->items[room->num_items];
-
+	struct item* item = &world_items.items[world_items.num_items];
+	
 	item->type = type;
-	set2f(item->sprite.position, x, y);
-	set2f(item->sprite.scale, 1.3f, 1.3f);
+	item->room_id = room_id;
+	set3f(item->sprite.position, x, y, 0.4f);
+	set2f(item->sprite.scale, 0.3f, 0.3f);
 
-	room->num_items++;
+	world_items.num_items++;
 
 	switch (type)
 	{
 		case ITEM_KEY:
 		{
 			animatedsprites_setanim(&item->anim, 1, atlas_frame_index(&game->atlas, "item_key"), 2, 100.0f);
+			animatedsprites_playanimation(&item->sprite, &item->anim);
 		}
 		break;
 		case ITEM_WEAPON:
 		{
 			animatedsprites_setanim(&item->anim, 1, atlas_frame_index(&game->atlas, "item_weapon"), 2, 100.0f);
+			animatedsprites_playanimation(&item->sprite, &item->anim);
+		}
+		break;
+		default:
+		{
+			animatedsprites_playanimation(&item->sprite, &game->anim_empty);
 		}
 		break;
 	}
-
-	animatedsprites_playanimation(&item->sprite, &item->anim);
 }
 
 void room_add_monster(int room_index, float x, float y)
@@ -477,7 +483,7 @@ void room_add_monster(int room_index, float x, float y)
 	animatedsprites_setanim(&monster->anim_die, 0, atlas_frame_index(&game->atlas, "monster_die"), 5, 40.0f);
 }
 
-void room_setup_tile(struct game* game, int room_index, int tile_index, enum tile_type type, int back)
+void room_setup_tile(int room_index, int tile_index, enum tile_type type, int back)
 {
 	struct anim** tile = back ? &game->rooms[room_index].tiles[tile_index].tile_back : 
 								&game->rooms[room_index].tiles[tile_index].tile_front;
@@ -544,7 +550,7 @@ void room_setup_tile(struct game* game, int room_index, int tile_index, enum til
 	}
 }
 
-void rooms_save(struct game* game)
+void rooms_save()
 {
 	FILE *fp;
 	fp = fopen(ROOMS_FILE_PATH, "wb+");
@@ -579,11 +585,21 @@ void room_setup_extra_data(int room_index, int tile_index)
 			room_add_monster(room_index, x, y);
 		}
 			break;
+		case EXTRA_DATA_ITEM:
+		{
+			enum item_type type = tile->extra_data[i + 1];
+			float x = *((float*)&tile->extra_data[i + 2]);
+			float y = *((float*)&tile->extra_data[i + 3]);
+			i += 3;
+
+			game_add_item(type, room_index, x, y);
+		}
+			break;
 		}
 	}
 }
 
-void rooms_load(struct game* game)
+void rooms_load()
 {
 	FILE *fp;
 	fp = stb_fopen(ROOMS_FILE_PATH, "rb");
@@ -600,20 +616,19 @@ void rooms_load(struct game* game)
 
 			fread(game->rooms[i].tiles[j].extra_data, sizeof(int), 8, fp);
 
-			room_setup_tile(game, i, j, type_back, 1);
-			room_setup_tile(game, i, j, type_front, 0);
+			room_setup_tile(i, j, type_back, 1);
+			room_setup_tile(i, j, type_front, 0);
 			room_setup_extra_data(i, j);
 		}
 	}
 	fclose(fp);
 }
 
-void rooms_init(struct game* game)
+void rooms_init()
 {
 	for (int i = 0; i < NUM_ROOMS; i++)
 	{
 		game->rooms[i].num_monsters = 0;
-		game->rooms[i].num_items = 0;
 
 		for (int j = 0; j < ROOM_SIZE; j++)
 		{
@@ -631,22 +646,82 @@ void rooms_init(struct game* game)
 /*
 * PLAYER
 */
-void player_walk(struct game* game, float dt);
-void player_set_arms(int hold);
+void player_walk(float dt);
+void player_set_arms();
+
+struct item* player_pickup_item()
+{
+	for (int i = 0; i < world_items.num_items; i++)
+	{
+		struct item* item = &world_items.items[i];
+
+		if (collide_circlef(item->sprite.position[0], item->sprite.position[1], 6.0f,
+			game->player.sprite.position[0], game->player.sprite.position[1] - 6.0f, 6.0f))
+		{
+			item->sprite.position[0] = -99999.0f;
+			return item;
+		}
+	}
+
+	return 0;
+}
+
+void player_drop_item(struct item* item)
+{
+	set2f(item->sprite.scale, 0.3f, 0.3f);
+	set3f(item->sprite.position, game->player.sprite.position[0], game->player.sprite.position[1] - 6.0f, 0.4f);
+	item->room_id = game->room_index;
+	refresh_sprites();
+}
 
 void player_try_pickup_drop()
 {
 	// Check if pickup or drop
 	if (key_pressed(GLFW_KEY_Z))
 	{
-		game->player.holding_item = game->player.holding_item ? 0 : 1;
-		player_set_arms(game->player.holding_item);
+		if (game->player.item)
+		{
+			player_drop_item(game->player.item);
+			game->player.item = 0;
+		}
+		else
+		{
+			struct item* item = player_pickup_item();
+
+			if (item)
+			{
+				game->player.item = item;
+			}
+		}
+
+		player_set_arms();
 	}
 }
 
-void player_die(struct game* game, float dt)
+void player_die(float dt)
 {
 	animatedsprites_switchanimation(&game->player.sprite, &game->player.anim_die);
+}
+
+void refresh_sprites()
+{
+	animatedsprites_clear(game->batcher);
+	animatedsprites_add(game->batcher, &game->player.sprite);
+	animatedsprites_add(game->batcher, &game->player.sprite_arms);
+	animatedsprites_add(game->batcher, &game->player.sprite_item);
+
+	for (int i = 0; i < game->rooms[game->room_index].num_monsters; i++)
+	{
+		animatedsprites_add(game->batcher, &game->rooms[game->room_index].monsters[i].sprite);
+	}
+
+	for (int i = 0; i < world_items.num_items; i++)
+	{
+		if (world_items.items[i].room_id == game->room_index)
+		{
+			animatedsprites_add(game->batcher, &world_items.items[i].sprite);
+		}
+	}
 }
 
 void switch_room(int room_index, float x, float y)
@@ -667,13 +742,16 @@ void switch_room(int room_index, float x, float y)
 		animatedsprites_add(game->batcher, &game->rooms[room_index].monsters[i].sprite);
 	}
 
-	for (int i = 0; i < game->rooms[room_index].num_items; i++)
+	for (int i = 0; i < world_items.num_items; i++)
 	{
-		animatedsprites_add(game->batcher, &game->rooms[room_index].items[i].sprite);
+		if (world_items.items[i].room_id == room_index)
+		{
+			animatedsprites_add(game->batcher, &world_items.items[i].sprite);
+		}
 	}
 }
 
-void player_idle(struct game* game, float dt)
+void player_idle(float dt)
 {
 	int enter_walk = 0;
 	if(key_pressed(GLFW_KEY_LEFT))
@@ -739,7 +817,7 @@ void player_idle(struct game* game, float dt)
 	}
 }
 
-void player_walk(struct game* game, float dt)
+void player_walk(float dt)
 {
 	// Check if player idle
 	if (!key_down(GLFW_KEY_RIGHT) && 
@@ -814,19 +892,19 @@ void player_walk(struct game* game, float dt)
 	set2f(game->debug_pos.position, game->player.sprite.position[0], game->player.sprite.position[1] - 8.0f);
 
 	// X check
-	if (!is_tile_collision(game, pos[0] - 4.0f, game->player.sprite.position[1] - 6.0f) &&
-		!is_tile_collision(game, pos[0] + 4.0f, game->player.sprite.position[1] - 6.0f) &&
-		!is_tile_collision(game, pos[0] - 4.0f, game->player.sprite.position[1] - 8.0f) &&
-		!is_tile_collision(game, pos[0] + 4.0f, game->player.sprite.position[1] - 8.0f) )
+	if (!is_tile_collision(pos[0] - 4.0f, game->player.sprite.position[1] - 6.0f) &&
+		!is_tile_collision(pos[0] + 4.0f, game->player.sprite.position[1] - 6.0f) &&
+		!is_tile_collision(pos[0] - 4.0f, game->player.sprite.position[1] - 8.0f) &&
+		!is_tile_collision(pos[0] + 4.0f, game->player.sprite.position[1] - 8.0f) )
 	{
 		set2f(game->player.sprite.position, pos[0], game->player.sprite.position[1]);
 	}
 	
 	// Y check
-	if (!is_tile_collision(game, game->player.sprite.position[0] - 4.0f, pos[1] - 6.0f) &&
-		!is_tile_collision(game, game->player.sprite.position[0] + 4.0f, pos[1] - 6.0f) &&
-		!is_tile_collision(game, game->player.sprite.position[0] - 4.0f, pos[1] - 8.0f) &&
-		!is_tile_collision(game, game->player.sprite.position[0] + 4.0f, pos[1] - 8.0f))
+	if (!is_tile_collision(game->player.sprite.position[0] - 4.0f, pos[1] - 6.0f) &&
+		!is_tile_collision(game->player.sprite.position[0] + 4.0f, pos[1] - 6.0f) &&
+		!is_tile_collision(game->player.sprite.position[0] - 4.0f, pos[1] - 8.0f) &&
+		!is_tile_collision(game->player.sprite.position[0] + 4.0f, pos[1] - 8.0f))
 	{
 		set2f(game->player.sprite.position, game->player.sprite.position[0], pos[1]);
 	}
@@ -839,9 +917,9 @@ void player_walk(struct game* game, float dt)
 	}
 }
 
-void player_set_arms(int hold)
+void player_set_arms()
 {
-	if (hold)
+	if (game->player.item)
 	{
 		animatedsprites_setanim(&game->player.anim_arms_idle_left, 1, atlas_frame_index(&game->atlas, "arms_left_hold"), 2, 700.0f);
 		animatedsprites_setanim(&game->player.anim_arms_idle_right, 1, atlas_frame_index(&game->atlas, "arms_right_hold"), 2, 700.0f);
@@ -852,14 +930,14 @@ void player_set_arms(int hold)
 		animatedsprites_setanim(&game->player.anim_arms_walk_up, 1, atlas_frame_index(&game->atlas, "arms_up_hold"), 2, 150.0f);
 		animatedsprites_setanim(&game->player.anim_arms_walk_down, 1, atlas_frame_index(&game->atlas, "arms_down_hold"), 2, 150.0f);
 
-		if (game->player.item == ITEM_KEY)
+		if (game->player.item->type == ITEM_KEY)
 		{
 			animatedsprites_setanim(&game->player.anim_item_left, 1, atlas_frame_index(&game->atlas, "key_left"), 1, 700.0f);
 			animatedsprites_setanim(&game->player.anim_item_right, 1, atlas_frame_index(&game->atlas, "key_right"), 1, 700.0f);
 			animatedsprites_setanim(&game->player.anim_item_up, 1, atlas_frame_index(&game->atlas, "key_up"), 1, 700.0f);
 			animatedsprites_setanim(&game->player.anim_item_down, 1, atlas_frame_index(&game->atlas, "key_down"), 1, 700.0f);
 		}
-		else if (game->player.item == ITEM_WEAPON)
+		else if (game->player.item->type == ITEM_WEAPON)
 		{
 			animatedsprites_setanim(&game->player.anim_item_left, 1, atlas_frame_index(&game->atlas, "weapon_left"), 1, 700.0f);
 			animatedsprites_setanim(&game->player.anim_item_right, 1, atlas_frame_index(&game->atlas, "weapon_right"), 1, 700.0f);
@@ -889,7 +967,7 @@ void player_set_arms(int hold)
 	game->player.sprite_item.anim = 0;
 }
 
-void player_init(struct game* game)
+void player_init()
 {
 	set2f(game->player.sprite.scale, 1.3f, 1.3f);
 	set2f(game->player.sprite_arms.scale, 1.3f, 1.3f);
@@ -898,9 +976,8 @@ void player_init(struct game* game)
 	game->player.speed = 0.04f;
 	game->player.state = &player_idle;
 	game->player.dir = DIR_DOWN;
-	game->player.holding_item = 0;
+	game->player.item = 0;
 	game->player.alive = 1;
-	game->player.item = ITEM_WEAPON;
 
 	animatedsprites_setanim(&game->player.anim_idle_left, 1, 0, 2, 700.0f);
 	animatedsprites_setanim(&game->player.anim_idle_right, 1, 2, 2, 700.0f);
@@ -913,12 +990,12 @@ void player_init(struct game* game)
 
 	animatedsprites_setanim(&game->player.anim_die, 0, atlas_frame_index(&game->atlas, "player_die"), 8, 40.0f);
 
-	player_set_arms(0);
+	player_set_arms();
 
 	animatedsprites_playanimation(&game->debug_pos, &game->anim_debug);
 }
 
-void player_think(struct game* game, float dt)
+void player_think(float dt)
 {
 	if (key_pressed(GLFW_KEY_P))
 	{
@@ -944,7 +1021,7 @@ void player_think(struct game* game, float dt)
 		set3f(game->player.sprite_item.position, game->player.sprite.position[0], game->player.sprite.position[1], 0.7f);
 	}
 
-	game->player.state(game, dt);
+	game->player.state(dt);
 }
 
 struct game_settings* game_get_settings()
@@ -998,14 +1075,14 @@ void room_edit_place_back(float x, float y)
 {
 	int index = 0;
 	struct room_tile* tile = get_room_tile_at(x, y, 16, 16, 16, &index);
-	room_setup_tile(game, game->room_index, index, game->edit_current_type, 1);
+	room_setup_tile(game->room_index, index, game->edit_current_type, 1);
 }
 
 void room_edit_place_front(float x, float y)
 {
 	int index = 0;
 	struct room_tile* tile = get_room_tile_at(x, y, 16, 16, 16, &index);
-	room_setup_tile(game, game->room_index, index, game->edit_current_type, 0);
+	room_setup_tile(game->room_index, index, game->edit_current_type, 0);
 }
 
 void room_edit_place_monster(float x, float y)
@@ -1036,7 +1113,7 @@ void room_edit_place_item(float x, float y, enum item_type type)
 	*((float*)&tile->extra_data[2]) = offset[0];
 	*((float*)&tile->extra_data[3]) = offset[1];
 
-	room_add_item(game->room_index, offset[0], offset[1], type);
+	game_add_item(type, game->room_index, offset[0], offset[1]);
 }
 
 void room_edit_place_door(float x, float y)
@@ -1049,7 +1126,7 @@ void room_edit_place_door(float x, float y)
 	tile->extra_data[0] = EXTRA_DATA_DOOR;
 
 	struct door* door = &game->doors[(int)game->edit_current_door];
-	tile->extra_data[1] = game->edit_current_door;
+	tile->extra_data[1] = (int)game->edit_current_door;
 	*((float*)&tile->extra_data[2]) = door->x;
 	*((float*)&tile->extra_data[3]) = door->y;
 }
@@ -1095,7 +1172,7 @@ void room_edit(float dt)
 	// Room save/load logic
 	if (key_pressed(GLFW_KEY_F9))
 	{
-		rooms_save(game);
+		rooms_save();
 	}
 
 	if (key_pressed(GLFW_KEY_F4))
@@ -1161,11 +1238,6 @@ void room_edit(float dt)
 	}
 }
 
-void shader_think(struct game* game)
-{
-
-}
-
 void monsters_think(float dt)
 {
 	struct room* room = &game->rooms[game->room_index];
@@ -1191,16 +1263,6 @@ void monsters_init()
 	}
 }
 
-void items_init()
-{
-	struct room* room = &game->rooms[game->room_index];
-
-	for (int i = 0; i < room->num_items; i++)
-	{
-		room->items[i].held = 0;
-	}
-}
-
 int sort_y(GLfloat* buffer_data_a, GLfloat* buffer_data_b)
 {
 	if (fabs(buffer_data_b[2] - buffer_data_a[2]) > 0.1f)
@@ -1218,7 +1280,7 @@ void game_think(struct core *core, struct graphics *g, float dt)
 	vec2 offset;
 	set2f(offset, 0.0f, 0.0f);
 
-	player_think(game, dt);
+	player_think(dt);
 	monsters_think(dt);
 
 	float dx = (game->player.sprite.position[0] - game->camera[0]) / 100.0f;
@@ -1351,8 +1413,9 @@ void game_init()
 
 	game->room_index = 0;
 	game->edit_current_type = TILE_NONE;
+	world_items.num_items = 0;
 
-	player_init(game);
+	player_init();
 
 	vec4 c;
 	set4f(c, 1.0f, 1.0f, 1.0f, 1.0f);
@@ -1361,8 +1424,8 @@ void game_init()
 	set2f(game->debug_pos.scale, 0.2f, 0.2f);
 	set2f(game->debug_pos.position, game->player.sprite.position[0], game->player.sprite.position[1]);
 
-	rooms_init(game);
-	rooms_load(game);
+	rooms_init();
+	rooms_load();
 
 	monsters_init();
 	doors_init();
