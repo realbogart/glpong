@@ -27,6 +27,7 @@
 
 #define ROOM_SIZE		256
 #define NUM_ROOMS		5
+#define MAX_MONSTERS	16
 
 #define ROOMS_FILE_PATH	"C:/programmering/ld34/glpong/ld34/assets/allrooms.world"
 
@@ -42,6 +43,7 @@ struct game_settings settings = {
 
 struct game;
 typedef void(*player_state_t)(struct game*, float);
+typedef void(*monster_state_t)(struct monster* monster, float);
 
 enum direction
 {
@@ -61,6 +63,30 @@ enum tile_type
 	TILE_WALL_MID,
 	TILE_WALL_BOTTOM,
 	TILE_STONEFLOOR
+};
+
+enum extra_data
+{
+	EXTRA_DATA_NONE = 0,
+	EXTRA_DATA_MONSTER,
+	EXTRA_DATA_KEY,
+	EXTRA_DATA_DOOR
+};
+
+struct monster
+{
+	struct sprite	sprite;
+	
+	enum direction	dir;
+
+	monster_state_t	state;
+
+	float			speed;
+
+	struct anim		anim_walk_left;
+	struct anim		anim_walk_right;
+	struct anim		anim_walk_up;
+	struct anim		anim_walk_down;
 };
 
 struct item
@@ -111,7 +137,9 @@ struct room_tile
 
 struct room
 {
-	struct room_tile tiles[ROOM_SIZE];
+	struct room_tile	tiles[ROOM_SIZE];
+	struct monster		monsters[MAX_MONSTERS];
+	int					num_monsters;
 };
 
 struct game {
@@ -142,6 +170,33 @@ struct game {
 	struct anim tiles_wall_mid;
 	struct anim tiles_wall_bottom;
 } *game = NULL;
+
+void monster_hunt(struct monster* monster, float dt)
+{
+	switch (monster->dir)
+	{
+	case DIR_LEFT:
+	{
+		animatedsprites_switchanimation(&monster->sprite, &monster->anim_walk_left);
+	}
+		break;
+	case DIR_RIGHT:
+	{
+		animatedsprites_switchanimation(&monster->sprite, &monster->anim_walk_right);
+	}
+		break;
+	case DIR_UP:
+	{
+		animatedsprites_switchanimation(&monster->sprite, &monster->anim_walk_up);
+	}
+		break;
+	case DIR_DOWN:
+	{
+		animatedsprites_switchanimation(&monster->sprite, &monster->anim_walk_down);
+	}
+		break;
+	}
+}
 
 void room_setup_tile(struct game* game, int room_index, int tile_index, enum tile_type type, int back)
 {
@@ -233,10 +288,33 @@ void rooms_load(struct game* game)
 	fclose(fp);
 }
 
+void room_add_monster(int room_index, float x, float y)
+{
+	struct room* room = &game->rooms[room_index];
+	struct monster* monster = &room->monsters[room->num_monsters];
+
+	set2f(monster->sprite.position, x, y);
+	set2f(monster->sprite.scale, 1.3f, 1.3f);
+
+	monster->dir = DIR_LEFT;
+	monster->speed = 0.1f;
+	monster->state = &monster_hunt;
+	room->num_monsters++;
+
+	animatedsprites_setanim(&monster->anim_walk_left, 1, atlas_frame_index(&game->atlas, "monster_walk_left"), 2, 100.0f);
+	animatedsprites_setanim(&monster->anim_walk_right, 1, atlas_frame_index(&game->atlas, "monster_walk_right"), 2, 100.0f);
+	animatedsprites_setanim(&monster->anim_walk_up, 1, atlas_frame_index(&game->atlas, "monster_walk_up"), 2, 100.0f);
+	animatedsprites_setanim(&monster->anim_walk_down, 1, atlas_frame_index(&game->atlas, "monster_walk_down"), 2, 100.0f);
+
+	animatedsprites_add(game->batcher, &monster->sprite);
+}
+
 void rooms_init(struct game* game)
 {
 	for (int i = 0; i < NUM_ROOMS; i++)
 	{
+		game->rooms[i].num_monsters = 0;
+
 		for (int j = 0; j < ROOM_SIZE; j++)
 		{
 			for (int k = 0; k < 8; k++)
@@ -301,29 +379,29 @@ void player_idle(struct game* game, float dt)
 	// Set correct idle animation
 	switch (game->player.dir)
 	{
-	case DIR_LEFT:
-	{
-		animatedsprites_switchanimation(&game->player.sprite, &game->player.anim_idle_left);
-		animatedsprites_switchanimation(&game->player.sprite_arms, &game->player.anim_arms_idle_left);
-	}
+		case DIR_LEFT:
+		{
+			animatedsprites_switchanimation(&game->player.sprite, &game->player.anim_idle_left);
+			animatedsprites_switchanimation(&game->player.sprite_arms, &game->player.anim_arms_idle_left);
+		}
 		break;
-	case DIR_RIGHT:
-	{
-		animatedsprites_switchanimation(&game->player.sprite, &game->player.anim_idle_right);
-		animatedsprites_switchanimation(&game->player.sprite_arms, &game->player.anim_arms_idle_right);
-	}
+		case DIR_RIGHT:
+		{
+			animatedsprites_switchanimation(&game->player.sprite, &game->player.anim_idle_right);
+			animatedsprites_switchanimation(&game->player.sprite_arms, &game->player.anim_arms_idle_right);
+		}
 		break;
-	case DIR_UP:
-	{
-		animatedsprites_switchanimation(&game->player.sprite, &game->player.anim_idle_up);
-		animatedsprites_switchanimation(&game->player.sprite_arms, &game->player.anim_arms_idle_up);
-	}
+		case DIR_UP:
+		{
+			animatedsprites_switchanimation(&game->player.sprite, &game->player.anim_idle_up);
+			animatedsprites_switchanimation(&game->player.sprite_arms, &game->player.anim_arms_idle_up);
+		}
 		break;
-	case DIR_DOWN:
-	{
-		animatedsprites_switchanimation(&game->player.sprite, &game->player.anim_idle_down);
-		animatedsprites_switchanimation(&game->player.sprite_arms, &game->player.anim_arms_idle_down);
-	}
+		case DIR_DOWN:
+		{
+			animatedsprites_switchanimation(&game->player.sprite, &game->player.anim_idle_down);
+			animatedsprites_switchanimation(&game->player.sprite_arms, &game->player.anim_arms_idle_down);
+		}
 		break;
 	}
 }
@@ -472,6 +550,7 @@ void player_set_arms(int hold)
 	game->player.sprite.anim = 0;
 	game->player.sprite_arms.anim = 0;
 }
+
 void player_init(struct game* game)
 {
 	set3f(game->player.sprite.position, -69.0f, -12.0f, 0);
@@ -571,6 +650,17 @@ void room_edit_place_front(float x, float y)
 	room_setup_tile(game, game->room_index, index, game->edit_current_type, 0);
 }
 
+void room_edit_place_monster(float x, float y)
+{
+	int index = 0;
+	struct room_tile* tile = get_room_tile_at(x, y, 16, 16, 16, &index);
+	tile->extra_data[0] = EXTRA_DATA_MONSTER;
+
+	vec2 offset;
+	set2f(offset, x - VIEW_WIDTH / 2, y - VIEW_HEIGHT / 2);
+	room_add_monster(game->room_index, offset[0], offset[1]);
+}
+
 void room_edit(float dt)
 {
 	int left_mouse = glfwGetMouseButton(core_global->graphics.window, GLFW_MOUSE_BUTTON_LEFT);
@@ -589,6 +679,10 @@ void room_edit(float dt)
 	if (right_mouse == GLFW_PRESS)
 	{
 		room_edit_place_front(x, y);
+	}
+	if (key_pressed(GLFW_KEY_KP_ADD))
+	{
+		room_edit_place_monster(x, y);
 	}
 
 	// Room save/load logic
@@ -665,6 +759,26 @@ void shader_think(struct game* game)
 
 }
 
+void monsters_think(float dt)
+{
+	struct room* room = &game->rooms[game->room_index];
+
+	for (int i = 0; i < room->num_monsters; i++)
+	{
+		room->monsters[i].state(&room->monsters[i], dt);
+	}
+}
+
+void monsters_init()
+{
+	struct room* room = &game->rooms[game->room_index];
+
+	for (int i = 0; i < room->num_monsters; i++)
+	{
+		room->monsters[i].state = &monster_hunt;
+	}
+}
+
 void game_think(struct core *core, struct graphics *g, float dt)
 {
 	room_edit(dt);
@@ -672,8 +786,9 @@ void game_think(struct core *core, struct graphics *g, float dt)
 	vec2 offset;
 	set2f(offset, 0.0f, 0.0f);
 
-	player_think( game, dt );
-	
+	player_think(game, dt);
+	monsters_think(dt);
+
 	float dx = (game->player.sprite.position[0] - game->camera[0]) / 100.0f;
 	float dy = (game->player.sprite.position[1] - game->camera[1]) / 100.0f;
 	
@@ -766,6 +881,8 @@ void game_init()
 
 	rooms_init(game);
 	rooms_load(game);
+
+	monsters_init();
 }
 
 void game_key_callback(struct core *core, struct input *input, GLFWwindow *window, int key,
