@@ -63,6 +63,11 @@ enum tile_type
 	TILE_STONEFLOOR
 };
 
+struct item
+{
+	struct sprite			sprite;
+};
+
 struct player{
 	struct sprite			sprite;
 	struct sprite			sprite_arms;
