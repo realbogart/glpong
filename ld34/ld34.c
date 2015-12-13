@@ -933,7 +933,7 @@ void room_edit_place_door(float x, float y)
 	tile->extra_data[0] = EXTRA_DATA_DOOR;
 
 	struct door* door = &game->doors[(int)game->edit_current_door];
-	tile->extra_data[2] = door->to_room_index;
+	tile->extra_data[1] = game->edit_current_door;
 	*((float*)&tile->extra_data[2]) = door->x;
 	*((float*)&tile->extra_data[3]) = door->y;
 }
@@ -1163,6 +1163,10 @@ void doors_init()
 	game->doors[0].to_room_index = 1;
 	game->doors[0].x = 100.0f;
 	game->doors[0].y = 100.0f;
+
+	game->doors[1].to_room_index = 0;
+	game->doors[1].x = -96.0f;
+	game->doors[1].y = 25.0f;
 }
 
 void game_init()
