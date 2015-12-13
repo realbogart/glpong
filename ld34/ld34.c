@@ -85,6 +85,8 @@ struct player{
 	struct anim				anim_arms_walk_up;
 	struct anim				anim_arms_walk_down;
 
+	int						holding_item;
+
 	enum direction			dir;
 
 	float					speed;
@@ -247,6 +249,17 @@ void rooms_init(struct game* game)
 * PLAYER
 */
 void player_walk(struct game* game, float dt);
+void player_set_arms(int hold);
+
+void player_try_pickup_drop()
+{
+	// Check if pickup or drop
+	if (key_pressed(GLFW_KEY_Z))
+	{
+		game->player.holding_item = game->player.holding_item ? 0 : 1;
+		player_set_arms(game->player.holding_item);
+	}
+}
 
 void player_idle(struct game* game, float dt)
 {
@@ -277,6 +290,8 @@ void player_idle(struct game* game, float dt)
 		game->player.state = &player_walk;
 		return;
 	}
+
+	player_try_pickup_drop();
 
 	// Set correct idle animation
 	switch (game->player.dir)
@@ -372,6 +387,8 @@ void player_walk(struct game* game, float dt)
 		pos[1] -= game->player.speed * dt;
 	}
 
+	player_try_pickup_drop();
+
 	// Move player and set correct walking animation
 	switch (game->player.dir)
 	{
@@ -422,6 +439,34 @@ void player_walk(struct game* game, float dt)
 	}
 }
 
+void player_set_arms(int hold)
+{
+	if (hold)
+	{
+		animatedsprites_setanim(&game->player.anim_arms_idle_left, 1, atlas_frame_index(&game->atlas, "arms_left_hold"), 2, 700.0f);
+		animatedsprites_setanim(&game->player.anim_arms_idle_right, 1, atlas_frame_index(&game->atlas, "arms_right_hold"), 2, 700.0f);
+		animatedsprites_setanim(&game->player.anim_arms_idle_up, 1, atlas_frame_index(&game->atlas, "arms_up_hold"), 2, 700.0f);
+		animatedsprites_setanim(&game->player.anim_arms_idle_down, 1, atlas_frame_index(&game->atlas, "arms_down_hold"), 2, 700.0f);
+		animatedsprites_setanim(&game->player.anim_arms_walk_left, 1, atlas_frame_index(&game->atlas, "arms_left_hold"), 2, 150.0f);
+		animatedsprites_setanim(&game->player.anim_arms_walk_right, 1, atlas_frame_index(&game->atlas, "arms_right_hold"), 2, 150.0f);
+		animatedsprites_setanim(&game->player.anim_arms_walk_up, 1, atlas_frame_index(&game->atlas, "arms_up_hold"), 2, 150.0f);
+		animatedsprites_setanim(&game->player.anim_arms_walk_down, 1, atlas_frame_index(&game->atlas, "arms_down_hold"), 2, 150.0f);
+	}
+	else
+	{
+		animatedsprites_setanim(&game->player.anim_arms_idle_left, 1, atlas_frame_index(&game->atlas, "arms_left"), 2, 700.0f);
+		animatedsprites_setanim(&game->player.anim_arms_idle_right, 1, atlas_frame_index(&game->atlas, "arms_right"), 2, 700.0f);
+		animatedsprites_setanim(&game->player.anim_arms_idle_up, 1, atlas_frame_index(&game->atlas, "arms_up"), 2, 700.0f);
+		animatedsprites_setanim(&game->player.anim_arms_idle_down, 1, atlas_frame_index(&game->atlas, "arms_down"), 2, 700.0f);
+		animatedsprites_setanim(&game->player.anim_arms_walk_left, 1, atlas_frame_index(&game->atlas, "arms_left"), 2, 150.0f);
+		animatedsprites_setanim(&game->player.anim_arms_walk_right, 1, atlas_frame_index(&game->atlas, "arms_right"), 2, 150.0f);
+		animatedsprites_setanim(&game->player.anim_arms_walk_up, 1, atlas_frame_index(&game->atlas, "arms_up"), 2, 150.0f);
+		animatedsprites_setanim(&game->player.anim_arms_walk_down, 1, atlas_frame_index(&game->atlas, "arms_down"), 2, 150.0f);
+	}
+
+	game->player.sprite.anim = 0;
+	game->player.sprite_arms.anim = 0;
+}
 void player_init(struct game* game)
 {
 	set3f(game->player.sprite.position, -69.0f, -12.0f, 0);
@@ -433,6 +478,7 @@ void player_init(struct game* game)
 	game->player.speed = 0.04f;
 	game->player.state = &player_idle;
 	game->player.dir = DIR_DOWN;
+	game->player.holding_item = 0;
 
 	animatedsprites_setanim(&game->player.anim_idle_left, 1, 0, 2, 700.0f);
 	animatedsprites_setanim(&game->player.anim_idle_right, 1, 2, 2, 700.0f);
@@ -443,14 +489,7 @@ void player_init(struct game* game)
 	animatedsprites_setanim(&game->player.anim_walk_up, 1, 12, 2, 150.0f);
 	animatedsprites_setanim(&game->player.anim_walk_down, 1, 14, 2, 150.0f);
 
-	animatedsprites_setanim(&game->player.anim_arms_idle_left, 1, atlas_frame_index(&game->atlas, "arms_left"), 2, 700.0f);
-	animatedsprites_setanim(&game->player.anim_arms_idle_right, 1, atlas_frame_index(&game->atlas, "arms_right"), 2, 700.0f);
-	animatedsprites_setanim(&game->player.anim_arms_idle_up, 1, atlas_frame_index(&game->atlas, "arms_up"), 2, 700.0f);
-	animatedsprites_setanim(&game->player.anim_arms_idle_down, 1, atlas_frame_index(&game->atlas, "arms_down"), 2, 700.0f);
-	animatedsprites_setanim(&game->player.anim_arms_walk_left, 1, atlas_frame_index(&game->atlas, "arms_left"), 2, 150.0f);
-	animatedsprites_setanim(&game->player.anim_arms_walk_right, 1, atlas_frame_index(&game->atlas, "arms_right"), 2, 150.0f);
-	animatedsprites_setanim(&game->player.anim_arms_walk_up, 1, atlas_frame_index(&game->atlas, "arms_up"), 2, 150.0f);
-	animatedsprites_setanim(&game->player.anim_arms_walk_down, 1, atlas_frame_index(&game->atlas, "arms_down"), 2, 150.0f);
+	player_set_arms(0);
 
 	animatedsprites_playanimation(&game->debug_pos, &game->anim_debug);
 
