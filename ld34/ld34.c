@@ -31,6 +31,7 @@
 #define MAX_MONSTERS	1024
 
 #define ROOMS_FILE_PATH	"C:/programmering/ld34/glpong/ld34/assets/allrooms.world"
+//#define ROOMS_FILE_PATH	"assets/allrooms.world"
 
 struct game_settings settings = {
 	.view_width			= VIEW_WIDTH,
@@ -380,8 +381,8 @@ void monster_hunt(struct monster* monster, float dt)
 		set2f(monster->sprite.position, pos[0], pos[1]);
 	}
 
-	drawable_new_circle_outlinef(&game->drawable_monster, monster->sprite.position[0], monster->sprite.position[1], 6.0f, 32, &assets->shaders.basic_shader);
-	drawable_new_circle_outlinef(&game->drawable_player, game->player.sprite.position[0], game->player.sprite.position[1] - 6.0f, 6.0f, 32, &assets->shaders.basic_shader);
+	//drawable_new_circle_outlinef(&game->drawable_monster, monster->sprite.position[0], monster->sprite.position[1], 6.0f, 32, &assets->shaders.basic_shader);
+	//drawable_new_circle_outlinef(&game->drawable_player, game->player.sprite.position[0], game->player.sprite.position[1] - 6.0f, 6.0f, 32, &assets->shaders.basic_shader);
 
 	// Check for player collision
 	if (collide_circlef(monster->sprite.position[0], monster->sprite.position[1], 6.0f, 
@@ -528,7 +529,7 @@ void room_setup_extra_data(int room_index, int tile_index)
 void rooms_load(struct game* game)
 {
 	FILE *fp;
-	fp = fopen(ROOMS_FILE_PATH, "rb");
+	fp = stb_fopen(ROOMS_FILE_PATH, "rb");
 
 	for (int i = 0; i < NUM_ROOMS; i++)
 	{
@@ -1114,10 +1115,10 @@ void game_render(struct core *core, struct graphics *g, float dt)
 	animatedsprites_render(game->batcher, &assets->shaders.basic_shader, g, assets->textures.textures, final);
 	tiles_render(&game->tiles_front, &assets->shaders.basic_shader, g, assets->textures.textures, transform);
 
-	vec4 c;
-	set4f(c, 1.0f, 1.0f, 1.0f, 1.0f);
-	drawable_render(&game->drawable_player, &assets->shaders.basic_shader, g, &core->textures.none, c, final);
-	drawable_render(&game->drawable_monster, &assets->shaders.basic_shader, g, &core->textures.none, c, final);
+	//vec4 c;
+	//set4f(c, 1.0f, 1.0f, 1.0f, 1.0f);
+	//drawable_render(&game->drawable_player, &assets->shaders.basic_shader, g, &core->textures.none, c, final);
+	//drawable_render(&game->drawable_monster, &assets->shaders.basic_shader, g, &core->textures.none, c, final);
 
 	if (!game->player.alive)
 	{
@@ -1175,6 +1176,14 @@ void doors_init()
 	game->doors[3].to_room_index = 0;
 	game->doors[3].x = -7.0f;
 	game->doors[3].y = -30.0f;
+
+	game->doors[4].to_room_index = 3;
+	game->doors[4].x = -100.0f;
+	game->doors[4].y = 180.0f;
+
+	game->doors[5].to_room_index = 0;
+	game->doors[5].x = 110.0f;
+	game->doors[5].y = 75.0f;
 }
 
 void game_init()
@@ -1218,6 +1227,9 @@ void game_init()
 
 	monsters_init();
 	doors_init();
+
+	//struct door* door = &game->doors[2];
+	//switch_room(door->to_room_index, door->x, door->y);
 
 	switch_room(0, -69.0f, -12.0f);
 }
