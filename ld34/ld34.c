@@ -29,6 +29,7 @@
 #define ROOM_SIZE		256
 #define NUM_ROOMS		5
 #define MAX_MONSTERS	1024
+#define MAX_ITEMS		16
 
 #define ROOMS_FILE_PATH	"C:/programmering/ld34/glpong/ld34/assets/allrooms.world"
 //#define ROOMS_FILE_PATH	"assets/allrooms.world"
@@ -73,7 +74,7 @@ enum extra_data
 {
 	EXTRA_DATA_NONE = 0,
 	EXTRA_DATA_MONSTER,
-	EXTRA_DATA_KEY,
+	EXTRA_DATA_ITEM,
 	EXTRA_DATA_DOOR
 };
 
@@ -95,14 +96,25 @@ struct monster
 	struct anim		anim_die;
 };
 
+enum item_type
+{
+	ITEM_KEY = 0,
+	ITEM_WEAPON
+};
+
 struct item
 {
-	struct sprite			sprite;
+	enum item_type	type;
+	struct sprite	sprite;
+	struct anim		anim;
+
+	int held;
 };
 
 struct player{
 	struct sprite			sprite;
 	struct sprite			sprite_arms;
+	struct sprite			sprite_item;
 
 	struct anim				anim_idle_left;
 	struct anim				anim_idle_right;
@@ -121,10 +133,19 @@ struct player{
 	struct anim				anim_arms_walk_right;
 	struct anim				anim_arms_walk_up;
 	struct anim				anim_arms_walk_down;
+
+	struct anim				anim_item_left;
+	struct anim				anim_item_right;
+	struct anim				anim_item_up;
+	struct anim				anim_item_down;
+
+	struct anim				anim_item;
+
 	struct anim				anim_die;
 
 	int						alive;
 	int						holding_item;
+	enum item_type			item;
 
 	enum direction			dir;
 
@@ -147,7 +168,9 @@ struct room
 {
 	struct room_tile	tiles[ROOM_SIZE];
 	struct monster		monsters[MAX_MONSTERS];
+	struct item			items[MAX_ITEMS];
 	int					num_monsters;
+	int					num_items;
 };
 
 struct door
@@ -392,6 +415,40 @@ void monster_hunt(struct monster* monster, float dt)
 	}
 }
 
+void room_add_item(int room_index, enum item_type type, float x, float y)
+{
+	struct room* room = &game->rooms[room_index];
+
+	if (room->num_items >= MAX_ITEMS)
+	{
+		return;
+	}
+
+	struct item* item = &room->items[room->num_items];
+
+	item->type = type;
+	set2f(item->sprite.position, x, y);
+	set2f(item->sprite.scale, 1.3f, 1.3f);
+
+	room->num_items++;
+
+	switch (type)
+	{
+		case ITEM_KEY:
+		{
+			animatedsprites_setanim(&item->anim, 1, atlas_frame_index(&game->atlas, "item_key"), 2, 100.0f);
+		}
+		break;
+		case ITEM_WEAPON:
+		{
+			animatedsprites_setanim(&item->anim, 1, atlas_frame_index(&game->atlas, "item_weapon"), 2, 100.0f);
+		}
+		break;
+	}
+
+	animatedsprites_playanimation(&item->sprite, &item->anim);
+}
+
 void room_add_monster(int room_index, float x, float y)
 {
 	struct room* room = &game->rooms[room_index];
@@ -556,6 +613,7 @@ void rooms_init(struct game* game)
 	for (int i = 0; i < NUM_ROOMS; i++)
 	{
 		game->rooms[i].num_monsters = 0;
+		game->rooms[i].num_items = 0;
 
 		for (int j = 0; j < ROOM_SIZE; j++)
 		{
@@ -602,10 +660,16 @@ void switch_room(int room_index, float x, float y)
 
 	animatedsprites_add(game->batcher, &game->player.sprite);
 	animatedsprites_add(game->batcher, &game->player.sprite_arms);
+	animatedsprites_add(game->batcher, &game->player.sprite_item);
 
 	for (int i = 0; i < game->rooms[room_index].num_monsters; i++)
 	{
 		animatedsprites_add(game->batcher, &game->rooms[room_index].monsters[i].sprite);
+	}
+
+	for (int i = 0; i < game->rooms[room_index].num_items; i++)
+	{
+		animatedsprites_add(game->batcher, &game->rooms[room_index].items[i].sprite);
 	}
 }
 
@@ -648,24 +712,28 @@ void player_idle(struct game* game, float dt)
 		{
 			animatedsprites_switchanimation(&game->player.sprite, &game->player.anim_idle_left);
 			animatedsprites_switchanimation(&game->player.sprite_arms, &game->player.anim_arms_idle_left);
+			animatedsprites_switchanimation(&game->player.sprite_item, &game->player.anim_item_left);
 		}
 		break;
 		case DIR_RIGHT:
 		{
 			animatedsprites_switchanimation(&game->player.sprite, &game->player.anim_idle_right);
 			animatedsprites_switchanimation(&game->player.sprite_arms, &game->player.anim_arms_idle_right);
+			animatedsprites_switchanimation(&game->player.sprite_item, &game->player.anim_item_right);
 		}
 		break;
 		case DIR_UP:
 		{
 			animatedsprites_switchanimation(&game->player.sprite, &game->player.anim_idle_up);
 			animatedsprites_switchanimation(&game->player.sprite_arms, &game->player.anim_arms_idle_up);
+			animatedsprites_switchanimation(&game->player.sprite_item, &game->player.anim_item_up);
 		}
 		break;
 		case DIR_DOWN:
 		{
 			animatedsprites_switchanimation(&game->player.sprite, &game->player.anim_idle_down);
 			animatedsprites_switchanimation(&game->player.sprite_arms, &game->player.anim_arms_idle_down);
+			animatedsprites_switchanimation(&game->player.sprite_item, &game->player.anim_item_down);
 		}
 		break;
 	}
@@ -717,24 +785,28 @@ void player_walk(struct game* game, float dt)
 	{
 		animatedsprites_switchanimation(&game->player.sprite, &game->player.anim_walk_left);
 		animatedsprites_switchanimation(&game->player.sprite_arms, &game->player.anim_arms_walk_left);
+		animatedsprites_switchanimation(&game->player.sprite_item, &game->player.anim_item_left);
 	}
 		break;
 	case DIR_RIGHT:
 	{
 		animatedsprites_switchanimation(&game->player.sprite, &game->player.anim_walk_right);
 		animatedsprites_switchanimation(&game->player.sprite_arms, &game->player.anim_arms_walk_right);
+		animatedsprites_switchanimation(&game->player.sprite_item, &game->player.anim_item_right);
 	}
 		break;
 	case DIR_UP:
 	{
 		animatedsprites_switchanimation(&game->player.sprite, &game->player.anim_walk_up);
 		animatedsprites_switchanimation(&game->player.sprite_arms, &game->player.anim_arms_walk_up);
+		animatedsprites_switchanimation(&game->player.sprite_item, &game->player.anim_item_up);
 	}
 		break;
 	case DIR_DOWN:
 	{
 		animatedsprites_switchanimation(&game->player.sprite, &game->player.anim_walk_down);
 		animatedsprites_switchanimation(&game->player.sprite_arms, &game->player.anim_arms_walk_down);
+		animatedsprites_switchanimation(&game->player.sprite_item, &game->player.anim_item_down);
 	}
 		break;
 	}
@@ -779,6 +851,21 @@ void player_set_arms(int hold)
 		animatedsprites_setanim(&game->player.anim_arms_walk_right, 1, atlas_frame_index(&game->atlas, "arms_right_hold"), 2, 150.0f);
 		animatedsprites_setanim(&game->player.anim_arms_walk_up, 1, atlas_frame_index(&game->atlas, "arms_up_hold"), 2, 150.0f);
 		animatedsprites_setanim(&game->player.anim_arms_walk_down, 1, atlas_frame_index(&game->atlas, "arms_down_hold"), 2, 150.0f);
+
+		if (game->player.item == ITEM_KEY)
+		{
+			animatedsprites_setanim(&game->player.anim_item_left, 1, atlas_frame_index(&game->atlas, "key_left"), 1, 700.0f);
+			animatedsprites_setanim(&game->player.anim_item_right, 1, atlas_frame_index(&game->atlas, "key_right"), 1, 700.0f);
+			animatedsprites_setanim(&game->player.anim_item_up, 1, atlas_frame_index(&game->atlas, "key_up"), 1, 700.0f);
+			animatedsprites_setanim(&game->player.anim_item_down, 1, atlas_frame_index(&game->atlas, "key_down"), 1, 700.0f);
+		}
+		else if (game->player.item == ITEM_WEAPON)
+		{
+			animatedsprites_setanim(&game->player.anim_item_left, 1, atlas_frame_index(&game->atlas, "weapon_left"), 1, 700.0f);
+			animatedsprites_setanim(&game->player.anim_item_right, 1, atlas_frame_index(&game->atlas, "weapon_right"), 1, 700.0f);
+			animatedsprites_setanim(&game->player.anim_item_up, 1, atlas_frame_index(&game->atlas, "weapon_up"), 1, 700.0f);
+			animatedsprites_setanim(&game->player.anim_item_down, 1, atlas_frame_index(&game->atlas, "weapon_down"), 1, 700.0f);
+		}
 	}
 	else
 	{
@@ -790,22 +877,30 @@ void player_set_arms(int hold)
 		animatedsprites_setanim(&game->player.anim_arms_walk_right, 1, atlas_frame_index(&game->atlas, "arms_right"), 2, 150.0f);
 		animatedsprites_setanim(&game->player.anim_arms_walk_up, 1, atlas_frame_index(&game->atlas, "arms_up"), 2, 150.0f);
 		animatedsprites_setanim(&game->player.anim_arms_walk_down, 1, atlas_frame_index(&game->atlas, "arms_down"), 2, 150.0f);
+
+		animatedsprites_setanim(&game->player.anim_item_left, 1, atlas_frame_index(&game->atlas, "empty"), 2, 700.0f);
+		animatedsprites_setanim(&game->player.anim_item_right, 1, atlas_frame_index(&game->atlas, "empty"), 2, 700.0f);
+		animatedsprites_setanim(&game->player.anim_item_up, 1, atlas_frame_index(&game->atlas, "empty"), 2, 700.0f);
+		animatedsprites_setanim(&game->player.anim_item_down, 1, atlas_frame_index(&game->atlas, "empty"), 2, 700.0f);
 	}
 
 	game->player.sprite.anim = 0;
 	game->player.sprite_arms.anim = 0;
+	game->player.sprite_item.anim = 0;
 }
 
 void player_init(struct game* game)
 {
 	set2f(game->player.sprite.scale, 1.3f, 1.3f);
 	set2f(game->player.sprite_arms.scale, 1.3f, 1.3f);
+	set2f(game->player.sprite_item.scale, 1.3f, 1.3f);
 
 	game->player.speed = 0.04f;
 	game->player.state = &player_idle;
 	game->player.dir = DIR_DOWN;
 	game->player.holding_item = 0;
 	game->player.alive = 1;
+	game->player.item = ITEM_WEAPON;
 
 	animatedsprites_setanim(&game->player.anim_idle_left, 1, 0, 2, 700.0f);
 	animatedsprites_setanim(&game->player.anim_idle_right, 1, 2, 2, 700.0f);
@@ -815,6 +910,7 @@ void player_init(struct game* game)
 	animatedsprites_setanim(&game->player.anim_walk_right, 1, 10, 2, 150.0f);
 	animatedsprites_setanim(&game->player.anim_walk_up, 1, 12, 2, 150.0f);
 	animatedsprites_setanim(&game->player.anim_walk_down, 1, 14, 2, 150.0f);
+
 	animatedsprites_setanim(&game->player.anim_die, 0, atlas_frame_index(&game->atlas, "player_die"), 8, 40.0f);
 
 	player_set_arms(0);
@@ -833,6 +929,7 @@ void player_think(struct game* game, float dt)
 	{
 		game->player.state = &player_die;
 		game->player.sprite_arms.position[0] = -99999.0f;
+		game->player.sprite_item.position[0] = -99999.0f;
 
 		// TODO: Check for restart
 		if (key_pressed(GLFW_KEY_X))
@@ -842,7 +939,9 @@ void player_think(struct game* game, float dt)
 	}
 	else
 	{
-		set2f(game->player.sprite_arms.position, game->player.sprite.position[0], game->player.sprite.position[1]);
+		game->player.sprite.position[2] = 0.0f;
+		set3f(game->player.sprite_arms.position, game->player.sprite.position[0], game->player.sprite.position[1], 0.5f);
+		set3f(game->player.sprite_item.position, game->player.sprite.position[0], game->player.sprite.position[1], 0.7f);
 	}
 
 	game->player.state(game, dt);
@@ -924,6 +1023,22 @@ void room_edit_place_monster(float x, float y)
 	room_add_monster(game->room_index, offset[0], offset[1]);
 }
 
+void room_edit_place_item(float x, float y, enum item_type type)
+{
+	int index = 0;
+	struct room_tile* tile = get_room_tile_at(x, y, 16, 16, 16, &index);
+
+	vec2 offset;
+	set2f(offset, x - VIEW_WIDTH / 2, y - VIEW_HEIGHT / 2);
+
+	tile->extra_data[0] = EXTRA_DATA_ITEM;
+	tile->extra_data[1] = type;
+	*((float*)&tile->extra_data[2]) = offset[0];
+	*((float*)&tile->extra_data[3]) = offset[1];
+
+	room_add_item(game->room_index, offset[0], offset[1], type);
+}
+
 void room_edit_place_door(float x, float y)
 {
 	int index = 0;
@@ -961,6 +1076,15 @@ void room_edit(float dt)
 	if (key_pressed(GLFW_KEY_KP_ADD))
 	{
 		room_edit_place_monster(x, y);
+	}
+
+	if (key_pressed(GLFW_KEY_W))
+	{
+		room_edit_place_item(x, y, ITEM_WEAPON);
+	}
+	if (key_pressed(GLFW_KEY_K))
+	{
+		room_edit_place_item(x, y, ITEM_KEY);
 	}
 
 	if (key_pressed(GLFW_KEY_INSERT))
@@ -1067,8 +1191,23 @@ void monsters_init()
 	}
 }
 
+void items_init()
+{
+	struct room* room = &game->rooms[game->room_index];
+
+	for (int i = 0; i < room->num_items; i++)
+	{
+		room->items[i].held = 0;
+	}
+}
+
 int sort_y(GLfloat* buffer_data_a, GLfloat* buffer_data_b)
 {
+	if (fabs(buffer_data_b[2] - buffer_data_a[2]) > 0.1f)
+	{
+		return buffer_data_b[2] - buffer_data_a[2];
+	}
+
 	return buffer_data_b[1] - buffer_data_a[1];
 }
 
@@ -1205,7 +1344,7 @@ void game_init()
 	animatedsprites_setanim(&game->anim_debug, 1, 25, 1, 100.0f);
 
 	animatedsprites_setanim(&game->tiles_switch_room, 1, atlas_frame_index(&game->atlas, "switch_room"), 1, 100.0f);
-	animatedsprites_setanim(&game->anim_empty, 0, atlas_frame_index(&game->atlas, "anim_empty"), 1, 100.0f);
+	animatedsprites_setanim(&game->anim_empty, 0, atlas_frame_index(&game->atlas, "empty"), 1, 100.0f);
 
 	tiles_init(&game->tiles_back, &tiles_get_back_data_at, 16, VIEW_WIDTH, VIEW_HEIGHT, 16, 16);
 	tiles_init(&game->tiles_front, &tiles_get_front_data_at, 16, VIEW_WIDTH, VIEW_HEIGHT, 16, 16);
