@@ -146,10 +146,14 @@ struct room
 
 struct game {
 	struct sprite			debug_pos;
+	struct sprite			sprite_killscreen;
+
 	struct anim				anim_debug;
 
 	struct atlas			atlas;
 	struct animatedsprites	*batcher;
+	struct animatedsprites	*batcher_statics;
+
 	struct tiles			tiles_back;
 	struct tiles			tiles_front;
 
@@ -326,6 +330,13 @@ void monster_hunt(struct monster* monster, float dt)
 	if (path_free)
 	{
 		set2f(monster->sprite.position, pos[0], pos[1]);
+	}
+
+	// Check for player collision
+	if (collide_circlef(monster->sprite.position[0], monster->sprite.position[1], 3.0f, 
+						game->player.sprite.position[0], game->player.sprite.position[1], 3.0f))
+	{
+		game->player.alive = 0;
 	}
 }
 
@@ -938,6 +949,8 @@ void game_think(struct core *core, struct graphics *g, float dt)
 	game->camera[1] += dy;
 
 	animatedsprites_update(game->batcher, &game->atlas, dt);
+	animatedsprites_update(game->batcher_statics, &game->atlas, dt);
+
 	tiles_think(&game->tiles_back, game->camera, &game->atlas, dt);
 	tiles_think(&game->tiles_front, game->camera, &game->atlas, dt);
 	shader_uniforms_think(&assets->shaders.basic_shader, dt);
@@ -961,6 +974,8 @@ void game_render(struct core *core, struct graphics *g, float dt)
 	tiles_render(&game->tiles_back, &assets->shaders.basic_shader, g, assets->textures.textures, transform);
 	animatedsprites_render(game->batcher, &assets->shaders.basic_shader, g, assets->textures.textures, final);
 	tiles_render(&game->tiles_front, &assets->shaders.basic_shader, g, assets->textures.textures, transform);
+
+	animatedsprites_render(game->batcher_statics, &assets->shaders.basic_shader, g, assets->textures.killscreen, transform);
 }
 
 void game_mousebutton_callback(struct core *core, GLFWwindow *window, int button, int action, int mods)
@@ -1000,6 +1015,7 @@ void game_init()
 {
 	glClearColor(0.0f, 0.0f, 0.0f, 0.0f);
 	game->batcher = animatedsprites_create();
+	game->batcher_statics = animatedsprites_create();
 
 	animatedsprites_setanim(&game->tiles_grass, 1, 16, 1, 100.0f);
 	animatedsprites_setanim(&game->tiles_grain, 1, 17, 1, 100.0f);
@@ -1021,6 +1037,10 @@ void game_init()
 	game->edit_current_type = TILE_NONE;
 
 	player_init(game);
+
+	set2f(game->sprite_killscreen.scale, 1.0f, 1.0f);
+	set2f(game->sprite_killscreen.position, 0.0f, 0.0f);
+	animatedsprites_add(game->batcher_statics, &game->sprite_killscreen);
 
 	set2f(game->debug_pos.scale, 0.2f, 0.2f);
 	set2f(game->debug_pos.position, game->player.sprite.position[0], game->player.sprite.position[1]);
