@@ -27,7 +27,7 @@
 
 #define ROOM_SIZE		256
 #define NUM_ROOMS		5
-#define MAX_MONSTERS	16
+#define MAX_MONSTERS	32
 
 #define ROOMS_FILE_PATH	"C:/programmering/ld34/glpong/ld34/assets/allrooms.world"
 
@@ -291,6 +291,12 @@ void rooms_load(struct game* game)
 void room_add_monster(int room_index, float x, float y)
 {
 	struct room* room = &game->rooms[room_index];
+
+	if (room->num_monsters >= MAX_MONSTERS)
+	{
+		return;
+	}
+
 	struct monster* monster = &room->monsters[room->num_monsters];
 
 	set2f(monster->sprite.position, x, y);
@@ -779,6 +785,11 @@ void monsters_init()
 	}
 }
 
+int sort_y(GLfloat* buffer_data_a, GLfloat* buffer_data_b)
+{
+	return buffer_data_b[1] - buffer_data_a[1];
+}
+
 void game_think(struct core *core, struct graphics *g, float dt)
 {
 	room_edit(dt);
@@ -813,6 +824,8 @@ void game_render(struct core *core, struct graphics *g, float dt)
 	set2f(offset, 0.0f, 0.0f);
 	translate(offset, -game->camera[0] + VIEW_WIDTH / 2, -game->camera[1] + VIEW_HEIGHT / 2, 0.0f);
 	transpose(final, offset);
+
+	animatedsprites_sort(game->batcher, sort_y);;
 
 	tiles_render(&game->tiles_back, &assets->shaders.basic_shader, g, assets->textures.textures, transform);
 	animatedsprites_render(game->batcher, &assets->shaders.basic_shader, g, assets->textures.textures, final);
