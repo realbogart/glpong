@@ -195,7 +195,6 @@ struct world_items
 } world_items;
 
 struct game {
-	struct sprite			debug_pos;
 	struct basic_sprite		sprite_killscreen;
 	struct basic_sprite		sprite_win;
 
@@ -473,11 +472,8 @@ void monster_hunt(struct monster* monster, float dt)
 
 	if (path_free)
 	{
-		set2f(monster->sprite.position, pos[0], pos[1]);
+		set3f(monster->sprite.position, pos[0], pos[1], 0.3f);
 	}
-
-	//drawable_new_circle_outlinef(&game->drawable_monster, monster->sprite.position[0], monster->sprite.position[1], 6.0f, 32, &assets->shaders.basic_shader);
-	//drawable_new_circle_outlinef(&game->drawable_player, game->player.sprite.position[0], game->player.sprite.position[1] - 6.0f, 6.0f, 32, &assets->shaders.basic_shader);
 
 	// Check for player collision
 	if (collide_circlef(monster->sprite.position[0], monster->sprite.position[1], 6.0f, 
@@ -503,7 +499,7 @@ void game_add_item(enum item_type type, int room_id, float x, float y)
 	
 	item->type = type;
 	item->room_id = room_id;
-	set3f(item->sprite.position, x, y, 0.4f);
+	set3f(item->sprite.position, x, y, 0.2f);
 	set2f(item->sprite.scale, 0.3f, 0.3f);
 
 	world_items.num_items++;
@@ -541,7 +537,7 @@ void room_add_monster(int room_index, float x, float y)
 
 	struct monster* monster = &room->monsters[room->num_monsters];
 
-	set2f(monster->sprite.position, x, y);
+	set3f(monster->sprite.position, x, y, 0.3f);
 	set2f(monster->sprite.scale, 0.8f, 0.8f);
 
 	monster->dir = DIR_LEFT;
@@ -752,7 +748,7 @@ struct item* player_pickup_item()
 void player_drop_item(struct item* item)
 {
 	set2f(item->sprite.scale, 0.3f, 0.3f);
-	set3f(item->sprite.position, game->player.sprite.position[0], game->player.sprite.position[1] - 6.0f, 0.4f);
+	set2f(item->sprite.position, game->player.sprite.position[0], game->player.sprite.position[1] - 6.0f);
 	item->room_id = game->room_index;
 	refresh_sprites();
 }
@@ -833,14 +829,6 @@ void player_die(float dt)
 void refresh_sprites()
 {
 	animatedsprites_clear(game->batcher);
-	animatedsprites_add(game->batcher, &game->player.sprite);
-	animatedsprites_add(game->batcher, &game->player.sprite_arms);
-	animatedsprites_add(game->batcher, &game->player.sprite_item);
-
-	for (int i = 0; i < game->rooms[game->room_index].num_monsters; i++)
-	{
-		animatedsprites_add(game->batcher, &game->rooms[game->room_index].monsters[i].sprite);
-	}
 
 	for (int i = 0; i < world_items.num_items; i++)
 	{
@@ -848,6 +836,15 @@ void refresh_sprites()
 		{
 			animatedsprites_add(game->batcher, &world_items.items[i].sprite);
 		}
+	}
+
+	animatedsprites_add(game->batcher, &game->player.sprite);
+	animatedsprites_add(game->batcher, &game->player.sprite_arms);
+	animatedsprites_add(game->batcher, &game->player.sprite_item);
+
+	for (int i = 0; i < game->rooms[game->room_index].num_monsters; i++)
+	{
+		animatedsprites_add(game->batcher, &game->rooms[game->room_index].monsters[i].sprite);
 	}
 
 	for (int i = 0; i < MAX_PROJECTILES; i++)
@@ -859,8 +856,8 @@ void refresh_sprites()
 void switch_room(int room_index, float x, float y)
 {
 	game->room_index = room_index;
-	set3f(game->player.sprite.position, x, y, 0);
-	set3f(game->camera, x, y, 0);
+	set2f(game->player.sprite.position, x, y);
+	set2f(game->camera, x, y);
 	refresh_sprites();
 }
 
@@ -1012,8 +1009,6 @@ void player_walk(float dt)
 		break;
 	}
 
-	set2f(game->debug_pos.position, game->player.sprite.position[0], game->player.sprite.position[1] - 8.0f);
-
 	try_win(pos[0] - 4.0f, game->player.sprite.position[1] - 6.0f);
 
 	try_unlock(pos[0] - 4.0f, game->player.sprite.position[1] - 6.0f);
@@ -1103,6 +1098,9 @@ void player_init()
 	set2f(game->player.sprite_arms.scale, 1.3f, 1.3f);
 	set2f(game->player.sprite_item.scale, 1.3f, 1.3f);
 
+	//game->player.sprite_arms.position[2] = 0.8f;
+	//game->player.sprite_item.position[2] = 0.9f;
+
 	game->player.speed = 0.04f;
 	game->player.state = &player_idle;
 	game->player.dir = DIR_DOWN;
@@ -1121,8 +1119,6 @@ void player_init()
 	animatedsprites_setanim(&game->player.anim_die, 0, atlas_frame_index(&game->atlas, "player_die"), 8, 40.0f);
 
 	player_set_arms();
-
-	animatedsprites_playanimation(&game->debug_pos, &game->anim_debug);
 }
 
 void player_think(float dt)
@@ -1146,9 +1142,8 @@ void player_think(float dt)
 	}
 	else
 	{
-		game->player.sprite.position[2] = 0.0f;
-		set3f(game->player.sprite_arms.position, game->player.sprite.position[0], game->player.sprite.position[1], 0.5f);
-		set3f(game->player.sprite_item.position, game->player.sprite.position[0], game->player.sprite.position[1], 0.7f);
+		set2f(game->player.sprite_arms.position, game->player.sprite.position[0], game->player.sprite.position[1]);
+		set2f(game->player.sprite_item.position, game->player.sprite.position[0], game->player.sprite.position[1]);
 	}
 
 	game->player.state(dt);
@@ -1418,7 +1413,7 @@ void projectiles_think(float dt)
 
 					sound_buf_play(&core_global->sound, assets->sounds.enemy_hit, game->sound_position);
 
-					set2f(projectile->sprite.position, -9999.0f, -9999.0f);
+					set3f(projectile->sprite.position, -9999.0f, -9999.0f, 0.2f);
 					projectile->direction = DIR_LEFT;
 					break;
 				}
@@ -1454,9 +1449,9 @@ void monsters_init()
 
 int sort_y(GLfloat* buffer_data_a, GLfloat* buffer_data_b)
 {
-	if (fabs(buffer_data_b[2] - buffer_data_a[2]) > 0.1f)
+	if (fabs(buffer_data_b[2] - buffer_data_a[2]) > 0.01f)
 	{
-		return buffer_data_b[2] - buffer_data_a[2];
+		return buffer_data_a[2] - buffer_data_b[2];
 	}
 
 	return buffer_data_b[1] - buffer_data_a[1];
@@ -1464,7 +1459,7 @@ int sort_y(GLfloat* buffer_data_a, GLfloat* buffer_data_b)
 
 void game_think(struct core *core, struct graphics *g, float dt)
 {
-	room_edit(dt);
+	//room_edit(dt);
 
 	vec2 offset;
 	set2f(offset, 0.0f, 0.0f);
@@ -1472,11 +1467,7 @@ void game_think(struct core *core, struct graphics *g, float dt)
 	player_think(dt);
 	monsters_think(dt);
 
-	float dx = (game->player.sprite.position[0] - game->camera[0]) / 100.0f;
-	float dy = (game->player.sprite.position[1] - game->camera[1]) / 100.0f;
-	
-	game->camera[0] += dx;
-	game->camera[1] += dy;
+	lerp2f( game->camera, game->player.sprite.position, 0.02f * dt);
 
 	animatedsprites_update(game->batcher, &game->atlas, dt);
 	animatedsprites_update(game->batcher_statics, &game->atlas, dt);
@@ -1506,11 +1497,6 @@ void game_render(struct core *core, struct graphics *g, float dt)
 	tiles_render(&game->tiles_back, &assets->shaders.basic_shader, g, assets->textures.textures, transform);
 	animatedsprites_render(game->batcher, &assets->shaders.basic_shader, g, assets->textures.textures, final);
 	tiles_render(&game->tiles_front, &assets->shaders.basic_shader, g, assets->textures.textures, transform);
-
-	//vec4 c;
-	//set4f(c, 1.0f, 1.0f, 1.0f, 1.0f);
-	//drawable_render(&game->drawable_player, &assets->shaders.basic_shader, g, &core->textures.none, c, final);
-	//drawable_render(&game->drawable_monster, &assets->shaders.basic_shader, g, &core->textures.none, c, final);
 
 	if (!game->player.alive)
 	{
@@ -1594,7 +1580,7 @@ void projectiles_init()
 
 		world_items.projectiles[i].direction = DIR_LEFT;
 		set2f(world_items.projectiles[i].sprite.scale, 0.6f, 0.6f);
-		set2f(world_items.projectiles[i].sprite.position, -9999.0f, -9999.0f);
+		set3f(world_items.projectiles[i].sprite.position, -9999.0f, -9999.0f, 0.5f);
 		animatedsprites_add(game->batcher, &world_items.projectiles[i].sprite);
 	}
 }
@@ -1632,21 +1618,18 @@ void game_init()
 	world_items.num_items = 0;
 
 	player_init();
-	projectiles_init();
 
 	vec4 c;
 	set4f(c, 1.0f, 1.0f, 1.0f, 1.0f);
 	sprite_init(&game->sprite_killscreen, 0, VIEW_WIDTH / 2.0f, VIEW_HEIGHT / 2.0f, 0.0f, 256.0f, 107.0f, c, 0.0f, &assets->textures.killscreen);
 	sprite_init(&game->sprite_win, 0, VIEW_WIDTH / 2.0f, VIEW_HEIGHT / 2.0f, 0.0f, 256.0f, 107.0f, c, 0.0f, &assets->textures.win);
 
-	set2f(game->debug_pos.scale, 0.2f, 0.2f);
-	set2f(game->debug_pos.position, game->player.sprite.position[0], game->player.sprite.position[1]);
-
 	rooms_init();
 	rooms_load();
 
 	monsters_init();
 	doors_init();
+	projectiles_init();
 
 	//struct door* door = &game->doors[2];
 	//switch_room(door->to_room_index, door->x, door->y);
