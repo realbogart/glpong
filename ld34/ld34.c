@@ -68,7 +68,8 @@ enum tile_type
 	TILE_STONEFLOOR,
 	TILE_CLEAR_EXTRA,
 	TILE_SWITCH_ROOM,
-	TILE_KEYHOLE
+	TILE_KEYHOLE,
+	TILE_WIN
 };
 
 enum extra_data
@@ -228,6 +229,7 @@ struct game {
 	struct anim tiles_wood;
 	struct anim tiles_stonefloor;
 	struct anim tiles_keyhole;
+	struct anim tiles_win;
 	struct anim tiles_wall_top;
 	struct anim tiles_wall_mid;
 	struct anim tiles_wall_bottom;
@@ -583,6 +585,11 @@ void room_setup_tile(int room_index, int tile_index, enum tile_type type, int ba
 		case TILE_KEYHOLE:
 		{
 			*tile = &game->tiles_keyhole;
+		}
+			break;
+		case TILE_WIN:
+		{
+			*tile = &game->tiles_win;
 		}
 			break;
 		case TILE_SWITCH_ROOM:
@@ -1251,6 +1258,7 @@ void room_edit(float dt)
 		room_edit_place_door(x, y);
 	}
 
+
 	// Room save/load logic
 	if (key_pressed(GLFW_KEY_F9))
 	{
@@ -1317,6 +1325,10 @@ void room_edit(float dt)
 	if (key_pressed(GLFW_KEY_KP_9))
 	{
 		game->edit_current_type = TILE_CLEAR_EXTRA;
+	}
+	if (key_pressed(GLFW_KEY_Y))
+	{
+		game->edit_current_type = TILE_WIN;
 	}
 }
 
@@ -1557,6 +1569,7 @@ void game_init()
 	animatedsprites_setanim(&game->tiles_stonefloor, 1, 24, 1, 100.0f);
 	animatedsprites_setanim(&game->anim_debug, 1, 25, 1, 100.0f);
 
+	animatedsprites_setanim(&game->tiles_win, 1, atlas_frame_index(&game->atlas, "win"), 1, 100.0f);
 	animatedsprites_setanim(&game->tiles_keyhole, 1, atlas_frame_index(&game->atlas, "keyhole"), 1, 100.0f);
 	animatedsprites_setanim(&game->tiles_switch_room, 1, atlas_frame_index(&game->atlas, "switch_room"), 1, 100.0f);
 	animatedsprites_setanim(&game->anim_empty, 0, atlas_frame_index(&game->atlas, "empty"), 1, 100.0f);
