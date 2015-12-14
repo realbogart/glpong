@@ -694,7 +694,7 @@
 	"pivot": {"x":0.5,"y":0.5}
 },
 {
-	"filename": "-",
+	"filename": "projectile",
 	"frame": {"x":80,"y":144,"w":16,"h":16},
 	"rotated": false,
 	"trimmed": false,

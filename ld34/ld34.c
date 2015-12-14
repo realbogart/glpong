@@ -30,6 +30,7 @@
 #define NUM_ROOMS		5
 #define MAX_MONSTERS	1024
 #define MAX_ITEMS		16
+#define MAX_PROJECTILES	32
 
 #define ROOMS_FILE_PATH	"C:/programmering/ld34/glpong/ld34/assets/allrooms.world"
 //#define ROOMS_FILE_PATH	"assets/allrooms.world"
@@ -175,10 +176,19 @@ struct door
 	float y;
 };
 
+struct projectile
+{
+	struct sprite sprite;
+	struct anim anim;
+	enum direction direction;
+};
+
 struct world_items
 {
 	int			num_items;
 	struct item	items[MAX_ITEMS];
+	struct projectile	projectiles[MAX_PROJECTILES];
+	int					current_projectile;
 } world_items;
 
 struct game {
@@ -702,9 +712,21 @@ void player_use_item()
 {
 	struct item* item = game->player.item;
 
-	if (item->type == ITEM_WEAPON)
+	if (game->player.item)
 	{
+		if (item->type == ITEM_WEAPON)
+		{
+			struct projectile* projectile = &world_items.projectiles[world_items.current_projectile];
+			set2f(projectile->sprite.position, game->player.sprite.position[0], game->player.sprite.position[1]);
+			projectile->direction = game->player.dir;
 
+			world_items.current_projectile++;
+
+			if (world_items.current_projectile >= MAX_PROJECTILES)
+			{
+				world_items.current_projectile = 0;
+			}
+		}
 	}
 }
 
@@ -758,6 +780,11 @@ void switch_room(int room_index, float x, float y)
 		{
 			animatedsprites_add(game->batcher, &world_items.items[i].sprite);
 		}
+	}
+
+	for (int i = 0; i < MAX_PROJECTILES; i++)
+	{
+		animatedsprites_add(game->batcher, &world_items.projectiles[i].sprite);
 	}
 }
 
@@ -1258,6 +1285,55 @@ void room_edit(float dt)
 	}
 }
 
+void projectiles_think(float dt)
+{
+	for (int i = 0; i < MAX_PROJECTILES; i++)
+	{
+		struct projectile* projectile = &world_items.projectiles[i];
+
+		float speed = 0.15f;
+
+		switch (projectile->direction)
+		{
+		case DIR_LEFT:
+		{
+			projectile->sprite.position[0] -= speed * dt;
+		}
+			break;
+		case DIR_RIGHT:
+		{
+			projectile->sprite.position[0] += speed * dt;
+		}
+			break;
+		case DIR_UP:
+		{
+			projectile->sprite.position[1] += speed * dt;
+		}
+			break;
+		case DIR_DOWN:
+		{
+			projectile->sprite.position[1] -= speed * dt;
+		}
+			break;
+		}
+
+		struct room* room = &game->rooms[game->room_index];
+
+		for (int j = 0; j < room->num_monsters; j++)
+		{
+			if (collide_circlef(room->monsters[j].sprite.position[0], room->monsters[j].sprite.position[1], 6.0f,
+				projectile->sprite.position[0], projectile->sprite.position[1], 6.0f))
+			{
+				room->monsters[j].alive = 0;
+
+				set2f(projectile->sprite.position, -9999.0f, -9999.0f);
+				projectile->direction = DIR_LEFT;
+				break;
+			}
+		}
+	}
+}
+
 void monsters_think(float dt)
 {
 	struct room* room = &game->rooms[game->room_index];
@@ -1311,6 +1387,8 @@ void game_think(struct core *core, struct graphics *g, float dt)
 
 	animatedsprites_update(game->batcher, &game->atlas, dt);
 	animatedsprites_update(game->batcher_statics, &game->atlas, dt);
+
+	projectiles_think(dt);
 
 	tiles_think(&game->tiles_back, game->camera, &game->atlas, dt);
 	tiles_think(&game->tiles_front, game->camera, &game->atlas, dt);
@@ -1407,6 +1485,22 @@ void doors_init()
 	game->doors[5].y = 75.0f;
 }
 
+void projectiles_init()
+{
+	world_items.current_projectile = 0;
+
+	for (int i = 0; i < MAX_PROJECTILES; i++)
+	{
+		animatedsprites_setanim(&world_items.projectiles[i].anim, 1, atlas_frame_index(&game->atlas, "projectile"), 1, 10.0f);
+		animatedsprites_playanimation(&world_items.projectiles[i].sprite, &world_items.projectiles[i].anim);
+
+		world_items.projectiles[i].direction = DIR_LEFT;
+		set2f(world_items.projectiles[i].sprite.scale, 0.6f, 0.6f);
+		set2f(world_items.projectiles[i].sprite.position, -9999.0f, -9999.0f);
+		animatedsprites_add(game->batcher, &world_items.projectiles[i].sprite);
+	}
+}
+
 void game_init()
 {
 	glClearColor(0.0f, 0.0f, 0.0f, 0.0f);
@@ -1436,6 +1530,7 @@ void game_init()
 	world_items.num_items = 0;
 
 	player_init();
+	projectiles_init();
 
 	vec4 c;
 	set4f(c, 1.0f, 1.0f, 1.0f, 1.0f);
