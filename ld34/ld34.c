@@ -196,6 +196,7 @@ struct world_items
 struct game {
 	struct sprite			debug_pos;
 	struct basic_sprite		sprite_killscreen;
+	struct basic_sprite		sprite_win;
 
 	struct anim				anim_debug;
 
@@ -220,6 +221,8 @@ struct game {
 
 	enum tile_type			edit_current_type;
 	float					edit_current_door;
+
+	int						win;
 
 	struct anim anim_empty;
 
@@ -252,7 +255,7 @@ int is_tile_collision(float x, float y)
 
 	if (index != -1)
 	{
-		if (tile->type_back != TILE_STONEFLOOR && tile->type_back != TILE_SWITCH_ROOM)
+		if (tile->type_back != TILE_STONEFLOOR && tile->type_back != TILE_SWITCH_ROOM && tile->type_back != TILE_WIN)
 		{
 			return 1;
 		}
@@ -311,6 +314,29 @@ void try_unlock(float x, float y)
 				game->player.item = 0;
 				player_set_arms();
 			}
+		}
+	}
+}
+
+void player_win(float dt)
+{
+
+}
+
+void try_win(float x, float y)
+{
+	x += VIEW_WIDTH / 2;
+	y += VIEW_HEIGHT / 2;
+
+	int index = -1;
+	struct room_tile* tile = get_room_tile_at(x, y, 16, 16, 16, &index);
+
+	if (index != -1)
+	{
+		if (tile->type_back == TILE_WIN)
+		{
+			game->player.state = &player_win;
+			game->win = 1;
 		}
 	}
 }
@@ -975,6 +1001,8 @@ void player_walk(float dt)
 
 	set2f(game->debug_pos.position, game->player.sprite.position[0], game->player.sprite.position[1] - 8.0f);
 
+	try_win(pos[0] - 4.0f, game->player.sprite.position[1] - 6.0f);
+
 	try_unlock(pos[0] - 4.0f, game->player.sprite.position[1] - 6.0f);
 	try_unlock(pos[0] + 4.0f, game->player.sprite.position[1] - 6.0f);
 	try_unlock(pos[0] - 4.0f, game->player.sprite.position[1] - 8.0);
@@ -1421,7 +1449,7 @@ int sort_y(GLfloat* buffer_data_a, GLfloat* buffer_data_b)
 
 void game_think(struct core *core, struct graphics *g, float dt)
 {
-	room_edit(dt);
+	//room_edit(dt);
 
 	vec2 offset;
 	set2f(offset, 0.0f, 0.0f);
@@ -1472,6 +1500,11 @@ void game_render(struct core *core, struct graphics *g, float dt)
 	if (!game->player.alive)
 	{
 		sprite_render(&game->sprite_killscreen, &assets->shaders.basic_shader, g);
+	}
+
+	if (game->win)
+	{
+		sprite_render(&game->sprite_win, &assets->shaders.basic_shader, g);
 	}
 }
 
@@ -1577,6 +1610,7 @@ void game_init()
 	tiles_init(&game->tiles_back, &tiles_get_back_data_at, 16, VIEW_WIDTH, VIEW_HEIGHT, 16, 16);
 	tiles_init(&game->tiles_front, &tiles_get_front_data_at, 16, VIEW_WIDTH, VIEW_HEIGHT, 16, 16);
 
+	game->win = 0;
 	game->room_index = 0;
 	game->edit_current_type = TILE_NONE;
 	world_items.num_items = 0;
@@ -1587,6 +1621,7 @@ void game_init()
 	vec4 c;
 	set4f(c, 1.0f, 1.0f, 1.0f, 1.0f);
 	sprite_init(&game->sprite_killscreen, 0, VIEW_WIDTH / 2.0f, VIEW_HEIGHT / 2.0f, 0.0f, 256.0f, 107.0f, c, 0.0f, &assets->textures.killscreen);
+	sprite_init(&game->sprite_win, 0, VIEW_WIDTH / 2.0f, VIEW_HEIGHT / 2.0f, 0.0f, 256.0f, 107.0f, c, 0.0f, &assets->textures.win);
 
 	set2f(game->debug_pos.scale, 0.2f, 0.2f);
 	set2f(game->debug_pos.position, game->player.sprite.position[0], game->player.sprite.position[1]);
