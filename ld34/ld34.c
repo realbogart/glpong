@@ -716,8 +716,26 @@ void player_use_item()
 	{
 		if (item->type == ITEM_WEAPON)
 		{
+			vec2 offset;
+			if (game->player.dir == DIR_LEFT)
+			{
+				set2f(offset, game->player.sprite.position[0] - 8.0f, game->player.sprite.position[1] + 2.0f);
+			}
+			else if (game->player.dir == DIR_RIGHT)
+			{
+				set2f(offset, game->player.sprite.position[0] + 8.0f, game->player.sprite.position[1] + 2.0f);
+			}
+			else if (game->player.dir == DIR_UP)
+			{
+				set2f(offset, game->player.sprite.position[0] + 3.0f, game->player.sprite.position[1] + 8.0f);
+			}
+			else if (game->player.dir == DIR_DOWN)
+			{
+				set2f(offset, game->player.sprite.position[0] - 3.0f, game->player.sprite.position[1] - 2.0f);
+			}
+
 			struct projectile* projectile = &world_items.projectiles[world_items.current_projectile];
-			set2f(projectile->sprite.position, game->player.sprite.position[0], game->player.sprite.position[1]);
+			set2f(projectile->sprite.position, offset[0], offset[1]);
 			projectile->direction = game->player.dir;
 
 			world_items.current_projectile++;
