@@ -22,6 +22,7 @@
 #include "collide.h"
 #include "drawable.h"
 #include "GLFW\glfw3.h"
+#include "sound.h"
 
 #define VIEW_WIDTH      256
 #define VIEW_HEIGHT		107
@@ -41,7 +42,7 @@ struct game_settings settings = {
 	.window_width		= VIEW_WIDTH,
 	.window_height		= VIEW_HEIGHT,
 	.window_title		= "ld34",
-	.sound_listener		= { VIEW_WIDTH / 2.0f, VIEW_HEIGHT / 2.0f, 0.0f },
+	.sound_listener		= { 0.0f, 0.0f, 0.0f },
 	.sound_distance_max = 500.0f, // distance3f(vec3(0), sound_listener)
 };
 
@@ -212,6 +213,7 @@ struct game {
 
 	struct player			player;
 
+	vec3					sound_position;
 	vec2					camera;
 
 	struct room				rooms[NUM_ROOMS];
@@ -313,6 +315,8 @@ void try_unlock(float x, float y)
 				tile->type_back = TILE_STONEFLOOR;
 				game->player.item = 0;
 				player_set_arms();
+
+				sound_buf_play(&core_global->sound, assets->sounds.unlock, game->sound_position);
 			}
 		}
 	}
@@ -479,6 +483,11 @@ void monster_hunt(struct monster* monster, float dt)
 	if (collide_circlef(monster->sprite.position[0], monster->sprite.position[1], 6.0f, 
 						game->player.sprite.position[0], game->player.sprite.position[1] - 6.0f, 6.0f))
 	{
+		if (game->player.alive)
+		{
+			sound_buf_play(&core_global->sound, assets->sounds.die, game->sound_position);
+		}
+			
 		game->player.alive = 0;
 	}
 }
@@ -756,6 +765,7 @@ void player_try_pickup_drop()
 		if (game->player.item)
 		{
 			player_drop_item(game->player.item);
+			sound_buf_play(&core_global->sound, assets->sounds.drop, game->sound_position);
 			game->player.item = 0;
 		}
 		else
@@ -764,6 +774,7 @@ void player_try_pickup_drop()
 
 			if (item)
 			{
+				sound_buf_play(&core_global->sound, assets->sounds.pickup, game->sound_position);
 				game->player.item = item;
 			}
 		}
@@ -801,6 +812,8 @@ void player_use_item()
 			struct projectile* projectile = &world_items.projectiles[world_items.current_projectile];
 			set2f(projectile->sprite.position, offset[0], offset[1]);
 			projectile->direction = game->player.dir;
+
+			sound_buf_play(&core_global->sound, assets->sounds.laser, game->sound_position);
 
 			world_items.current_projectile++;
 
@@ -1403,6 +1416,8 @@ void projectiles_think(float dt)
 				{
 					room->monsters[j].alive = 0;
 
+					sound_buf_play(&core_global->sound, assets->sounds.enemy_hit, game->sound_position);
+
 					set2f(projectile->sprite.position, -9999.0f, -9999.0f);
 					projectile->direction = DIR_LEFT;
 					break;
@@ -1449,7 +1464,7 @@ int sort_y(GLfloat* buffer_data_a, GLfloat* buffer_data_b)
 
 void game_think(struct core *core, struct graphics *g, float dt)
 {
-	//room_edit(dt);
+	room_edit(dt);
 
 	vec2 offset;
 	set2f(offset, 0.0f, 0.0f);
@@ -1610,6 +1625,7 @@ void game_init()
 	tiles_init(&game->tiles_back, &tiles_get_back_data_at, 16, VIEW_WIDTH, VIEW_HEIGHT, 16, 16);
 	tiles_init(&game->tiles_front, &tiles_get_front_data_at, 16, VIEW_WIDTH, VIEW_HEIGHT, 16, 16);
 
+	set3f( game->sound_position, 0.0f, 0.0f, 0.0f);
 	game->win = 0;
 	game->room_index = 0;
 	game->edit_current_type = TILE_NONE;
