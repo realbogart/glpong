@@ -754,38 +754,19 @@ void refresh_sprites()
 			animatedsprites_add(game->batcher, &world_items.items[i].sprite);
 		}
 	}
-}
-
-void switch_room(int room_index, float x, float y)
-{
-	game->room_index = room_index;
-
-	animatedsprites_clear(game->batcher);
-
-	set3f(game->player.sprite.position, x, y, 0);
-	set3f(game->camera, x, y, 0);
-
-	animatedsprites_add(game->batcher, &game->player.sprite);
-	animatedsprites_add(game->batcher, &game->player.sprite_arms);
-	animatedsprites_add(game->batcher, &game->player.sprite_item);
-
-	for (int i = 0; i < game->rooms[room_index].num_monsters; i++)
-	{
-		animatedsprites_add(game->batcher, &game->rooms[room_index].monsters[i].sprite);
-	}
-
-	for (int i = 0; i < world_items.num_items; i++)
-	{
-		if (world_items.items[i].room_id == room_index)
-		{
-			animatedsprites_add(game->batcher, &world_items.items[i].sprite);
-		}
-	}
 
 	for (int i = 0; i < MAX_PROJECTILES; i++)
 	{
 		animatedsprites_add(game->batcher, &world_items.projectiles[i].sprite);
 	}
+}
+
+void switch_room(int room_index, float x, float y)
+{
+	game->room_index = room_index;
+	set3f(game->player.sprite.position, x, y, 0);
+	set3f(game->camera, x, y, 0);
+	refresh_sprites();
 }
 
 void player_idle(float dt)
@@ -1321,14 +1302,17 @@ void projectiles_think(float dt)
 
 		for (int j = 0; j < room->num_monsters; j++)
 		{
-			if (collide_circlef(room->monsters[j].sprite.position[0], room->monsters[j].sprite.position[1], 6.0f,
-				projectile->sprite.position[0], projectile->sprite.position[1], 6.0f))
+			if (room->monsters[j].alive)
 			{
-				room->monsters[j].alive = 0;
+				if (collide_circlef(room->monsters[j].sprite.position[0], room->monsters[j].sprite.position[1], 6.0f,
+					projectile->sprite.position[0], projectile->sprite.position[1], 1.0f))
+				{
+					room->monsters[j].alive = 0;
 
-				set2f(projectile->sprite.position, -9999.0f, -9999.0f);
-				projectile->direction = DIR_LEFT;
-				break;
+					set2f(projectile->sprite.position, -9999.0f, -9999.0f);
+					projectile->direction = DIR_LEFT;
+					break;
+				}
 			}
 		}
 	}
