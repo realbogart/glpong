@@ -83,8 +83,8 @@ int		graphics_init(struct graphics *g, think_func_t think, render_func_t render,
 				fps_func_t fps_callback, int view_width, int view_height, int window_mode,
 				const char *title, int window_width, int window_height);
 void	graphics_free(struct core* core, struct graphics *g);
-void	graphics_loop();
+void	graphics_loop(void);
 
-double	now();
+double	now(void);
 
 #endif

@@ -54,28 +54,6 @@ void tiles_init(struct tiles *tiles, tiles_get_data_at_pixel_t get_data_at_pixel
 	tiles->draw_tiles = (struct sprite *) calloc(tiles->draw_tiles_x * tiles->draw_tiles_y, sizeof(struct sprite));
 	memset(tiles->draw_tiles, 0, tiles->draw_tiles_x * tiles->draw_tiles_y * sizeof(struct sprite));
 	tiles->batcher = animatedsprites_create();
-
-	/* Set up draw tiles. */
-	for(int x = 0; x < tiles->draw_tiles_x; x++) {
-		for(int y = 0; y < tiles->draw_tiles_y; y++) {
-			struct sprite *draw_tile = tiles_get_draw_tile(tiles->draw_tiles, x, y,
-				tiles->draw_tiles_x, tiles->draw_tiles_y);
-
-			if(draw_tile == NULL) {
-				continue;
-			}
-
-			/* FIXME: need a size parameter! Force 32x32 tiles... */
-			set2f(draw_tile->scale, 1.0f, 1.0f);
-
-			set3f(draw_tile->position,
-					(x-1) * tile_size + tile_size/2.0f,
-					(y-1) * tile_size + tile_size/2.0f,
-					0);
-
-			animatedsprites_add(tiles->batcher, draw_tile);
-		}
-	}
 }
 
 void tiles_free(struct tiles *tiles)
@@ -95,6 +73,8 @@ void tiles_free(struct tiles *tiles)
  */
 void tiles_think(struct tiles *tiles, vec2 view_offset, struct atlas *atlas, float dt)
 {
+	animatedsprites_clear(tiles->batcher);
+
 	/* Update draw tiles */
 	for(int x = 0; x < tiles->draw_tiles_x; x++) {
 		for(int y = 0; y < tiles->draw_tiles_y; y++) {
@@ -104,6 +84,8 @@ void tiles_think(struct tiles *tiles, vec2 view_offset, struct atlas *atlas, flo
 			if(draw_tile == NULL) {
 				continue;
 			}
+
+			animatedsprites_add(tiles->batcher, draw_tile);
 
 			float grid_x = (x-1) * tiles->tile_size + tiles->tile_size/2.0f - fmod(view_offset[0], tiles->tile_size);
 			float grid_y = (y-1) * tiles->tile_size + tiles->tile_size/2.0f - fmod(view_offset[1], tiles->tile_size);
@@ -117,6 +99,8 @@ void tiles_think(struct tiles *tiles, vec2 view_offset, struct atlas *atlas, flo
 			if(draw_tile->anim != type) {
 				animatedsprites_playanimation(draw_tile, type);
 			}
+
+			set2f(draw_tile->scale, 1.0f, 1.0f);
 
 			/* Move within the viewport. */
 			set3f(draw_tile->position, grid_x, grid_y, 0);

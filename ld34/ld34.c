@@ -33,8 +33,8 @@
 #define MAX_ITEMS		16
 #define MAX_PROJECTILES	32
 
-#define ROOMS_FILE_PATH	"C:/programmering/ld34/glpong/ld34/assets/allrooms.world"
-//#define ROOMS_FILE_PATH	"assets/allrooms.world"
+//#define ROOMS_FILE_PATH	"C:/programmering/ld34/glpong/ld34/assets/allrooms.world"
+#define ROOMS_FILE_PATH	"assets/allrooms.world"
 
 struct game_settings settings = {
 	.view_width			= VIEW_WIDTH,
@@ -47,7 +47,7 @@ struct game_settings settings = {
 };
 
 typedef void(*player_state_t)(float);
-typedef void(*monster_state_t)(struct monster* monster, float);
+typedef void(*monster_state_t)(struct monster*, float);
 
 enum direction
 {
@@ -202,7 +202,6 @@ struct game {
 
 	struct atlas			atlas;
 	struct animatedsprites	*batcher;
-	struct animatedsprites	*batcher_statics;
 
 	struct drawable			drawable_monster;
 	struct drawable			drawable_player;
@@ -244,7 +243,8 @@ struct game {
 struct room_tile* get_room_tile_at(float x, float y, int tile_size, int grid_x_max, int grid_y_max, int* tile_index_out);
 void room_edit_place_front(float x, float y);
 void room_edit_place_back(float x, float y);
-void refresh_sprites();
+void refresh_sprites(void);
+void reset_state(void);
 
 int is_tile_collision(float x, float y)
 {
@@ -294,7 +294,7 @@ int is_switch_room(float x, float y, int* door_id_out)
 }
 
 void player_walk(float dt);
-void player_set_arms();
+void player_set_arms(void);
 
 void try_unlock(float x, float y)
 {
@@ -323,7 +323,6 @@ void try_unlock(float x, float y)
 
 void player_win(float dt)
 {
-
 }
 
 void try_win(float x, float y)
@@ -631,7 +630,7 @@ void room_setup_tile(int room_index, int tile_index, enum tile_type type, int ba
 	}
 }
 
-void rooms_save()
+void rooms_save(void)
 {
 	FILE *fp;
 	fp = fopen(ROOMS_FILE_PATH, "wb+");
@@ -680,7 +679,7 @@ void room_setup_extra_data(int room_index, int tile_index)
 	}
 }
 
-void rooms_load()
+void rooms_load(void)
 {
 	FILE *fp;
 	fp = stb_fopen(ROOMS_FILE_PATH, "rb");
@@ -705,7 +704,7 @@ void rooms_load()
 	fclose(fp);
 }
 
-void rooms_init()
+void rooms_init(void)
 {
 	for (int i = 0; i < NUM_ROOMS; i++)
 	{
@@ -728,7 +727,7 @@ void rooms_init()
 * PLAYER
 */
 
-struct item* player_pickup_item()
+struct item* player_pickup_item(void)
 {
 	for (int i = 0; i < world_items.num_items; i++)
 	{
@@ -753,7 +752,7 @@ void player_drop_item(struct item* item)
 	refresh_sprites();
 }
 
-void player_try_pickup_drop()
+void player_try_pickup_drop(void)
 {
 	// Check if pickup or drop
 	if (key_pressed(GLFW_KEY_Z))
@@ -779,7 +778,7 @@ void player_try_pickup_drop()
 	}
 }
 
-void player_use_item()
+void player_use_item(void)
 {
 	struct item* item = game->player.item;
 
@@ -826,7 +825,7 @@ void player_die(float dt)
 	animatedsprites_switchanimation(&game->player.sprite, &game->player.anim_die);
 }
 
-void refresh_sprites()
+void refresh_sprites(void)
 {
 	animatedsprites_clear(game->batcher);
 
@@ -1013,7 +1012,7 @@ void player_walk(float dt)
 
 	try_unlock(pos[0] - 4.0f, game->player.sprite.position[1] - 6.0f);
 	try_unlock(pos[0] + 4.0f, game->player.sprite.position[1] - 6.0f);
-	try_unlock(pos[0] - 4.0f, game->player.sprite.position[1] - 8.0);
+	try_unlock(pos[0] - 4.0f, game->player.sprite.position[1] - 8.0f);
 	try_unlock(pos[0] + 4.0f, game->player.sprite.position[1] - 8.0f);
 
 	// X check
@@ -1042,7 +1041,7 @@ void player_walk(float dt)
 	}
 }
 
-void player_set_arms()
+void player_set_arms(void)
 {
 	if (game->player.item)
 	{
@@ -1081,10 +1080,10 @@ void player_set_arms()
 		animatedsprites_setanim(&game->player.anim_arms_walk_up, 1, atlas_frame_index(&game->atlas, "arms_up"), 2, 150.0f);
 		animatedsprites_setanim(&game->player.anim_arms_walk_down, 1, atlas_frame_index(&game->atlas, "arms_down"), 2, 150.0f);
 
-		animatedsprites_setanim(&game->player.anim_item_left, 1, atlas_frame_index(&game->atlas, "empty"), 2, 700.0f);
-		animatedsprites_setanim(&game->player.anim_item_right, 1, atlas_frame_index(&game->atlas, "empty"), 2, 700.0f);
-		animatedsprites_setanim(&game->player.anim_item_up, 1, atlas_frame_index(&game->atlas, "empty"), 2, 700.0f);
-		animatedsprites_setanim(&game->player.anim_item_down, 1, atlas_frame_index(&game->atlas, "empty"), 2, 700.0f);
+		animatedsprites_setanim(&game->player.anim_item_left, 1, atlas_frame_index(&game->atlas, "empty"), 1, 700.0f);
+		animatedsprites_setanim(&game->player.anim_item_right, 1, atlas_frame_index(&game->atlas, "empty"), 1, 700.0f);
+		animatedsprites_setanim(&game->player.anim_item_up, 1, atlas_frame_index(&game->atlas, "empty"), 1, 700.0f);
+		animatedsprites_setanim(&game->player.anim_item_down, 1, atlas_frame_index(&game->atlas, "empty"), 1, 700.0f);
 	}
 
 	game->player.sprite.anim = 0;
@@ -1092,14 +1091,15 @@ void player_set_arms()
 	game->player.sprite_item.anim = 0;
 }
 
-void player_init()
+void player_init(void)
 {
 	set2f(game->player.sprite.scale, 1.3f, 1.3f);
 	set2f(game->player.sprite_arms.scale, 1.3f, 1.3f);
 	set2f(game->player.sprite_item.scale, 1.3f, 1.3f);
 
-	//game->player.sprite_arms.position[2] = 0.8f;
-	//game->player.sprite_item.position[2] = 0.9f;
+	game->player.sprite.position[2] = 0.3f;
+	game->player.sprite_arms.position[2] = 0.35f;
+	game->player.sprite_item.position[2] = 0.45f;
 
 	game->player.speed = 0.04f;
 	game->player.state = &player_idle;
@@ -1137,7 +1137,7 @@ void player_think(float dt)
 		// TODO: Check for restart
 		if (key_pressed(GLFW_KEY_X))
 		{
-			game_init();
+			reset_state();
 		}
 	}
 	else
@@ -1149,7 +1149,7 @@ void player_think(float dt)
 	game->player.state(dt);
 }
 
-struct game_settings* game_get_settings()
+struct game_settings* game_get_settings(void)
 {
 	return &settings;
 }
@@ -1199,14 +1199,14 @@ struct room_tile* get_room_tile_at(float x, float y, int tile_size, int grid_x_m
 void room_edit_place_back(float x, float y)
 {
 	int index = 0;
-	struct room_tile* tile = get_room_tile_at(x, y, 16, 16, 16, &index);
+	get_room_tile_at(x, y, 16, 16, 16, &index);
 	room_setup_tile(game->room_index, index, game->edit_current_type, 1);
 }
 
 void room_edit_place_front(float x, float y)
 {
 	int index = 0;
-	struct room_tile* tile = get_room_tile_at(x, y, 16, 16, 16, &index);
+	get_room_tile_at(x, y, 16, 16, 16, &index);
 	room_setup_tile(game->room_index, index, game->edit_current_type, 0);
 }
 
@@ -1437,7 +1437,7 @@ void monsters_think(float dt)
 	}
 }
 
-void monsters_init()
+void monsters_init(void)
 {
 	struct room* room = &game->rooms[game->room_index];
 
@@ -1451,13 +1451,13 @@ int sort_y(GLfloat* buffer_data_a, GLfloat* buffer_data_b)
 {
 	if (fabs(buffer_data_b[2] - buffer_data_a[2]) > 0.01f)
 	{
-		return buffer_data_a[2] - buffer_data_b[2];
+		return buffer_data_a[2] * 100.0f - buffer_data_b[2] * 100.0f;
 	}
 
-	return buffer_data_b[1] - buffer_data_a[1];
+	return buffer_data_b[1] * 100.0f - buffer_data_a[1] * 100.0f;
 }
 
-void game_think(struct core *core, struct graphics *g, float dt)
+void game_think(struct core* core, struct graphics* g, float dt)
 {
 	//room_edit(dt);
 
@@ -1470,7 +1470,6 @@ void game_think(struct core *core, struct graphics *g, float dt)
 	lerp2f( game->camera, game->player.sprite.position, 0.02f * dt);
 
 	animatedsprites_update(game->batcher, &game->atlas, dt);
-	animatedsprites_update(game->batcher_statics, &game->atlas, dt);
 
 	projectiles_think(dt);
 
@@ -1479,7 +1478,7 @@ void game_think(struct core *core, struct graphics *g, float dt)
 	shader_uniforms_think(&assets->shaders.basic_shader, dt);
 }
 
-void game_render(struct core *core, struct graphics *g, float dt)
+void game_render(struct core* core, struct graphics *g, float dt)
 {
 	glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
@@ -1492,8 +1491,9 @@ void game_render(struct core *core, struct graphics *g, float dt)
 	translate(offset, -game->camera[0] + VIEW_WIDTH / 2, -game->camera[1] + VIEW_HEIGHT / 2, 0.0f);
 	transpose(final, offset);
 
-	animatedsprites_sort(game->batcher, sort_y);;
+	animatedsprites_sort(game->batcher, sort_y);
 
+	
 	tiles_render(&game->tiles_back, &assets->shaders.basic_shader, g, assets->textures.textures, transform);
 	animatedsprites_render(game->batcher, &assets->shaders.basic_shader, g, assets->textures.textures, final);
 	tiles_render(&game->tiles_front, &assets->shaders.basic_shader, g, assets->textures.textures, transform);
@@ -1509,7 +1509,7 @@ void game_render(struct core *core, struct graphics *g, float dt)
 	}
 }
 
-void game_mousebutton_callback(struct core *core, GLFWwindow *window, int button, int action, int mods)
+void game_mousebutton_callback(struct core* core, GLFWwindow *window, int button, int action, int mods)
 {
 	if (action == GLFW_PRESS) {
 		float x = 0, y = 0;
@@ -1542,7 +1542,7 @@ struct anim* tiles_get_front_data_at(float x, float y,
 	return game->rooms[game->room_index].tiles[tile_index].tile_front;
 }
 
-void doors_init()
+void doors_init(void)
 {
 	game->doors[0].to_room_index = 1;
 	game->doors[0].x = 100.0f;
@@ -1569,13 +1569,13 @@ void doors_init()
 	game->doors[5].y = 75.0f;
 }
 
-void projectiles_init()
+void projectiles_init(void)
 {
 	world_items.current_projectile = 0;
 
 	for (int i = 0; i < MAX_PROJECTILES; i++)
 	{
-		animatedsprites_setanim(&world_items.projectiles[i].anim, 1, atlas_frame_index(&game->atlas, "projectile"), 1, 10.0f);
+		animatedsprites_setanim(&world_items.projectiles[i].anim, 1, atlas_frame_index(&game->atlas, "projectile"), 3, 40.0f);
 		animatedsprites_playanimation(&world_items.projectiles[i].sprite, &world_items.projectiles[i].anim);
 
 		world_items.projectiles[i].direction = DIR_LEFT;
@@ -1585,11 +1585,9 @@ void projectiles_init()
 	}
 }
 
-void game_init()
+void reset_state(void)
 {
-	glClearColor(0.0f, 0.0f, 0.0f, 0.0f);
-	game->batcher = animatedsprites_create();
-	game->batcher_statics = animatedsprites_create();
+	animatedsprites_clear(game->batcher);
 
 	game->edit_current_door = 0;
 	animatedsprites_setanim(&game->tiles_grass, 1, 16, 1, 100.0f);
@@ -1608,36 +1606,39 @@ void game_init()
 	animatedsprites_setanim(&game->tiles_switch_room, 1, atlas_frame_index(&game->atlas, "switch_room"), 1, 100.0f);
 	animatedsprites_setanim(&game->anim_empty, 0, atlas_frame_index(&game->atlas, "empty"), 1, 100.0f);
 
-	tiles_init(&game->tiles_back, &tiles_get_back_data_at, 16, VIEW_WIDTH, VIEW_HEIGHT, 16, 16);
-	tiles_init(&game->tiles_front, &tiles_get_front_data_at, 16, VIEW_WIDTH, VIEW_HEIGHT, 16, 16);
-
-	set3f( game->sound_position, 0.0f, 0.0f, 0.0f);
+	set3f(game->sound_position, 0.0f, 0.0f, 0.0f);
 	game->win = 0;
 	game->room_index = 0;
 	game->edit_current_type = TILE_NONE;
 	world_items.num_items = 0;
 
 	player_init();
+	rooms_init();
+	rooms_load();
+	monsters_init();
+	doors_init();
+	projectiles_init();
+
+	switch_room(0, -69.0f, -12.0f);
+}
+
+void game_init(void)
+{
+	glClearColor(0.0f, 0.0f, 0.0f, 0.0f);
+	game->batcher = animatedsprites_create();
+
+	tiles_init(&game->tiles_back, &tiles_get_back_data_at, 16, VIEW_WIDTH, VIEW_HEIGHT, 16, 16);
+	tiles_init(&game->tiles_front, &tiles_get_front_data_at, 16, VIEW_WIDTH, VIEW_HEIGHT, 16, 16);
 
 	vec4 c;
 	set4f(c, 1.0f, 1.0f, 1.0f, 1.0f);
 	sprite_init(&game->sprite_killscreen, 0, VIEW_WIDTH / 2.0f, VIEW_HEIGHT / 2.0f, 0.0f, 256.0f, 107.0f, c, 0.0f, &assets->textures.killscreen);
 	sprite_init(&game->sprite_win, 0, VIEW_WIDTH / 2.0f, VIEW_HEIGHT / 2.0f, 0.0f, 256.0f, 107.0f, c, 0.0f, &assets->textures.win);
 
-	rooms_init();
-	rooms_load();
-
-	monsters_init();
-	doors_init();
-	projectiles_init();
-
-	//struct door* door = &game->doors[2];
-	//switch_room(door->to_room_index, door->x, door->y);
-
-	switch_room(0, -69.0f, -12.0f);
+	reset_state();
 }
 
-void game_key_callback(struct core *core, struct input *input, GLFWwindow *window, int key,
+void game_key_callback(struct core* core, struct input* input, GLFWwindow *window, int key,
 	int scancode, int action, int mods)
 {
 	if(action == GLFW_PRESS) {
@@ -1649,13 +1650,13 @@ void game_key_callback(struct core *core, struct input *input, GLFWwindow *windo
 	}
 }
 
-void game_assets_load()
+void game_assets_load(void)
 {
 	assets_load();
 	vfs_register_callback("textures.json", core_reload_atlas, &game->atlas);
 }
 
-void game_assets_release()
+void game_assets_release(void)
 {
 	assets_release();
 	atlas_free(&game->atlas);

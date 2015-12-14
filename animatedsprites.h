@@ -44,7 +44,7 @@ struct animatedsprites
 	unsigned int sprite_todraw_count;
 };
 
-struct animatedsprites* animatedsprites_create();
+struct animatedsprites* animatedsprites_create(void);
 void animatedsprites_init(struct animatedsprites* animatedsprites);
 void animatedsprites_destroy(struct animatedsprites* animatedsprites);
 

@@ -8,7 +8,7 @@
 
 #include <stdlib.h>
 
-struct animatedsprites* animatedsprites_create()
+struct animatedsprites* animatedsprites_create(void)
 {
 	struct animatedsprites* as = (struct animatedsprites*)malloc(sizeof(struct animatedsprites));
 	as->sprite_todraw_count = 0;
@@ -26,7 +26,7 @@ void animatedsprites_update(struct animatedsprites* animatedsprites, struct atla
 {
 	spritebatch_begin(&animatedsprites->spritebatch);
 
-	for (int i = 0; i < animatedsprites->sprite_todraw_count; i++)
+	for (unsigned int i = 0; i < animatedsprites->sprite_todraw_count; i++)
 	{
 		struct sprite* current_sprite = animatedsprites->sprites_todraw[i];
 
