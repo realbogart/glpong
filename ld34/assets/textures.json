@@ -721,7 +721,7 @@
 	"pivot": {"x":0.5,"y":0.5}
 },
 {
-	"filename": "-",
+	"filename": "keyhole",
 	"frame": {"x":0,"y":160,"w":16,"h":16},
 	"rotated": false,
 	"trimmed": false,
@@ -730,7 +730,7 @@
 	"pivot": {"x":0.5,"y":0.5}
 },
 {
-	"filename": "-",
+	"filename": "win",
 	"frame": {"x":16,"y":160,"w":16,"h":16},
 	"rotated": false,
 	"trimmed": false,

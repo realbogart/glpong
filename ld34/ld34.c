@@ -67,7 +67,8 @@ enum tile_type
 	TILE_WALL_BOTTOM,
 	TILE_STONEFLOOR,
 	TILE_CLEAR_EXTRA,
-	TILE_SWITCH_ROOM
+	TILE_SWITCH_ROOM,
+	TILE_KEYHOLE
 };
 
 enum extra_data
@@ -226,6 +227,7 @@ struct game {
 	struct anim tiles_grain;
 	struct anim tiles_wood;
 	struct anim tiles_stonefloor;
+	struct anim tiles_keyhole;
 	struct anim tiles_wall_top;
 	struct anim tiles_wall_mid;
 	struct anim tiles_wall_bottom;
@@ -283,6 +285,32 @@ int is_switch_room(float x, float y, int* door_id_out)
 	}
 
 	return 0;
+}
+
+void player_walk(float dt);
+void player_set_arms();
+
+void try_unlock(float x, float y)
+{
+	x += VIEW_WIDTH / 2;
+	y += VIEW_HEIGHT / 2;
+
+	int index = -1;
+	struct room_tile* tile = get_room_tile_at(x, y, 16, 16, 16, &index);
+
+	if (index != -1)
+	{
+		if (tile->type_back == TILE_KEYHOLE)
+		{
+			if (game->player.item && game->player.item->type == ITEM_KEY)
+			{
+				tile->tile_back = &game->tiles_stonefloor;
+				tile->type_back = TILE_STONEFLOOR;
+				game->player.item = 0;
+				player_set_arms();
+			}
+		}
+	}
 }
 
 void monster_die(struct monster* monster, float dt)
@@ -552,6 +580,11 @@ void room_setup_tile(int room_index, int tile_index, enum tile_type type, int ba
 			*tile = &game->tiles_stonefloor;
 		}
 			break;
+		case TILE_KEYHOLE:
+		{
+			*tile = &game->tiles_keyhole;
+		}
+			break;
 		case TILE_SWITCH_ROOM:
 		{
 			*tile = &game->tiles_switch_room;
@@ -656,8 +689,6 @@ void rooms_init()
 /*
 * PLAYER
 */
-void player_walk(float dt);
-void player_set_arms();
 
 struct item* player_pickup_item()
 {
@@ -936,6 +967,11 @@ void player_walk(float dt)
 	}
 
 	set2f(game->debug_pos.position, game->player.sprite.position[0], game->player.sprite.position[1] - 8.0f);
+
+	try_unlock(pos[0] - 4.0f, game->player.sprite.position[1] - 6.0f);
+	try_unlock(pos[0] + 4.0f, game->player.sprite.position[1] - 6.0f);
+	try_unlock(pos[0] - 4.0f, game->player.sprite.position[1] - 8.0);
+	try_unlock(pos[0] + 4.0f, game->player.sprite.position[1] - 8.0f);
 
 	// X check
 	if (!is_tile_collision(pos[0] - 4.0f, game->player.sprite.position[1] - 6.0f) &&
@@ -1276,7 +1312,7 @@ void room_edit(float dt)
 	}
 	if (key_pressed(GLFW_KEY_KP_8))
 	{
-
+		game->edit_current_type = TILE_KEYHOLE;
 	}
 	if (key_pressed(GLFW_KEY_KP_9))
 	{
@@ -1521,6 +1557,7 @@ void game_init()
 	animatedsprites_setanim(&game->tiles_stonefloor, 1, 24, 1, 100.0f);
 	animatedsprites_setanim(&game->anim_debug, 1, 25, 1, 100.0f);
 
+	animatedsprites_setanim(&game->tiles_keyhole, 1, atlas_frame_index(&game->atlas, "keyhole"), 1, 100.0f);
 	animatedsprites_setanim(&game->tiles_switch_room, 1, atlas_frame_index(&game->atlas, "switch_room"), 1, 100.0f);
 	animatedsprites_setanim(&game->anim_empty, 0, atlas_frame_index(&game->atlas, "empty"), 1, 100.0f);
 
